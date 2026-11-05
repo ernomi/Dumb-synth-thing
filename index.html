@@ -34,6 +34,8 @@
       </div>
       <div class="controls">
         <button id="play" aria-pressed="false" type="button">▶ Play</button>
+        <button id="recBtn" aria-pressed="false" type="button">● Record</button>
+        <button id="shapesBtn" aria-pressed="true" type="button">Shapes: on</button>
         <button id="liveBtn" type="button">Live camera</button>
         <button id="photoBtn" type="button">Take photo</button>
         <button id="uploadBtn" type="button">Upload image</button>
@@ -42,6 +44,15 @@
         <button id="sampleBtn" type="button">Sample scene</button>
       </div>
       <p class="status" id="status" role="status">Showing a built-in sample scene. Press Play to hear it.</p>
+      <div class="take" id="take" hidden>
+        <span class="label">Recording</span>
+        <video id="takeVideo" playsinline controls preload="metadata"></video>
+        <div class="controls">
+          <button id="shareBtn" type="button">Share</button>
+          <a id="saveBtn" class="btn" href="#" download>Save</a>
+          <button id="discardBtn" type="button">Discard</button>
+        </div>
+      </div>
     </section>
 
     <aside class="panel">

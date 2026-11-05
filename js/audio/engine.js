@@ -40,6 +40,14 @@ export function setPlaying(on) {
   if (on) syncVoices(currentTracks); else stopAll();
 }
 
+/** The final mix (exactly what the speaker gets) as a MediaStream, for recording. */
+let recordDest = null;
+export function getAudioStream() {
+  initAudio();
+  if (!recordDest) { recordDest = ac.createMediaStreamDestination(); analyser.connect(recordDest); }
+  return recordDest.stream;
+}
+
 export function setVolume(v) {
   if (master) master.gain.setTargetAtTime(v, ac.currentTime, 0.05);
 }

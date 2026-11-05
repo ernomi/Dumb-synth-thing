@@ -46,21 +46,27 @@ export function sizeView(view, w, h) {
   if (view.width !== cw || view.height !== ch) { view.width = cw; view.height = ch; }
 }
 
-/** Outline each tracked shape. Hulls are in analysis pixels (aw x ah). */
-export function drawOverlay(ctx, tracks, aw, ah) {
-  const view = ctx.canvas, sx = view.width / aw, sy = view.height / ah;
-  const lw = Math.max(2, view.width / 260);
+/**
+ * Outline each tracked shape. Hulls are in analysis pixels (aw x ah).
+ * @param rect  where the full image sits on the canvas (may extend past it when cropped)
+ * @param unit  reference width for line and label sizes
+ */
+export function drawOverlay(ctx, tracks, aw, ah, rect, unit) {
+  const r = rect || { x: 0, y: 0, w: ctx.canvas.width, h: ctx.canvas.height };
+  const u = unit || ctx.canvas.width;
+  const sx = r.w / aw, sy = r.h / ah;
+  const lw = Math.max(2, u / 260);
   for (const tr of tracks) {
     const c = voiceColor(tr), h = tr.obj.hull;
     ctx.beginPath();
-    h.forEach((p, i) => i ? ctx.lineTo(p[0] * sx, p[1] * sy) : ctx.moveTo(p[0] * sx, p[1] * sy));
+    h.forEach((p, i) => i ? ctx.lineTo(r.x + p[0] * sx, r.y + p[1] * sy) : ctx.moveTo(r.x + p[0] * sx, r.y + p[1] * sy));
     ctx.closePath();
     ctx.globalAlpha = 0.16; ctx.fillStyle = c; ctx.fill();
     ctx.globalAlpha = 1; ctx.lineWidth = lw; ctx.strokeStyle = c; ctx.stroke();
-    const fs = Math.max(12, view.width / 42);
+    const fs = Math.max(12, u / 42);
     ctx.font = `500 ${fs}px "IBM Plex Mono", ui-monospace, monospace`;
     const label = tr.p.note, tw = ctx.measureText(label).width;
-    const lx = tr.obj.cx * view.width - tw / 2 - 6, ly = tr.obj.cy * view.height - fs * 0.75;
+    const lx = r.x + tr.obj.cx * r.w - tw / 2 - 6, ly = r.y + tr.obj.cy * r.h - fs * 0.75;
     ctx.fillStyle = c; roundRect(ctx, lx, ly, tw + 12, fs * 1.5, 6); ctx.fill();
     ctx.fillStyle = "#ffffff"; ctx.textBaseline = "middle"; ctx.fillText(label, lx + 6, ly + fs * 0.76);
   }

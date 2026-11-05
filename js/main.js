@@ -9,6 +9,9 @@ import { renderVoices, renderScene, sizeView, drawOverlay, drawScope } from "./u
 import { makeSample } from "./sources/sample.js";
 import { startCamera, stopCamera } from "./sources/camera.js";
 import { loadImageFile } from "./sources/image-file.js";
+import { createRecordCanvas, drawRecordFrame } from "./recording/compose.js";
+import { Recorder, recordingSupported } from "./recording/recorder.js";
+import { videoFile, isMp4, canShareFile, shareFile } from "./recording/share.js";
 
 const $ = (id) => document.getElementById(id);
 const view = $("view"), vctx = view.getContext("2d");
@@ -23,6 +26,16 @@ let analysisSize = { W: 256, H: 192 };
 let sceneInfo = null;
 const tracker = new Tracker();
 const sample = makeSample();
+
+// Shape outlines on screen and in recordings; remembered per device
+let showShapes = true;
+try { showShapes = localStorage.getItem("pw.showShapes") !== "0"; } catch (e) {}
+
+// Recording
+const MAX_SECONDS = 90;
+const recCanvas = createRecordCanvas(), rctx = recCanvas.getContext("2d");
+let recorder = null;
+let take = null; // { file, url } of the last recording
 
 // ---------- status ----------
 const setStatus = (t) => { $("status").textContent = t; };
@@ -56,15 +69,21 @@ const showVoices = () => renderVoices($("voices"), tracker.tracks);
 const showScene = () => renderScene($("scene"), sceneInfo, audio.toneAmount());
 
 // ---------- frame loop ----------
+function currentSource() {
+  if (mode === "live" && video.readyState >= 2 && video.videoWidth) return [video, video.videoWidth, video.videoHeight];
+  if (still) return [still, still.width, still.height];
+  return [null, 0, 0];
+}
+
 function frame(now) {
-  if (mode === "live" && video.readyState >= 2 && video.videoWidth) {
-    sizeView(view, video.videoWidth, video.videoHeight);
-    vctx.drawImage(video, 0, 0, view.width, view.height);
-    if (now - lastAnalysis > 120) { lastAnalysis = now; analyze(video, video.videoWidth, video.videoHeight, false); }
-  } else if (still) {
-    vctx.drawImage(still, 0, 0, view.width, view.height);
+  const [src, sw, sh] = currentSource();
+  if (src === video) {
+    sizeView(view, sw, sh);
+    if (now - lastAnalysis > 120) { lastAnalysis = now; analyze(video, sw, sh, false); }
   }
-  drawOverlay(vctx, tracker.tracks, analysisSize.W, analysisSize.H);
+  if (src) vctx.drawImage(src, 0, 0, view.width, view.height);
+  if (showShapes) drawOverlay(vctx, tracker.tracks, analysisSize.W, analysisSize.H);
+  if (recorder) drawRecordFrame(rctx, src, sw, sh, showShapes ? { tracks: tracker.tracks, aw: analysisSize.W, ah: analysisSize.H } : null);
   drawScope(sctx, audio.getAnalyser());
   requestAnimationFrame(frame);
 }
@@ -118,16 +137,91 @@ document.addEventListener("pointerdown", () => { if (audio.needsUnlock()) audio.
 for (const id of ["liveBtn", "sampleBtn", "photoBtn", "uploadBtn"])
   $(id).addEventListener("click", () => { if (audio.isPlaying()) audio.unlockAudio(); }, true);
 
-$("play").addEventListener("click", () => {
+function setPlaying(playing) {
   audio.unlockAudio();
   setTimeout(audio.audioCheck, 800);
-  const playing = !audio.isPlaying();
   audio.setPlaying(playing);
   $("play").setAttribute("aria-pressed", String(playing));
   $("play").textContent = playing ? "■ Stop" : "▶ Play";
+}
+$("play").addEventListener("click", () => {
+  const playing = !audio.isPlaying();
+  setPlaying(playing);
   if (playing && mode !== "live") setStatus(tracker.tracks.length ? "Playing. Try another photo, or the live camera." : "Playing, but no shapes are in view.");
   if (!playing) setStatus("Stopped.");
 });
+
+// ---------- shapes toggle ----------
+function setShowShapes(on) {
+  showShapes = on;
+  $("shapesBtn").setAttribute("aria-pressed", String(on));
+  $("shapesBtn").textContent = on ? "Shapes: on" : "Shapes: off";
+  try { localStorage.setItem("pw.showShapes", on ? "1" : "0"); } catch (e) {}
+}
+$("shapesBtn").addEventListener("click", () => setShowShapes(!showShapes));
+setShowShapes(showShapes);
+
+// ---------- recording ----------
+const clock = s => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, "0")}`;
+
+function setRecordingUI(on) {
+  $("recBtn").setAttribute("aria-pressed", String(on));
+  $("recBtn").textContent = on ? "■ 0:00" : "● Record";
+}
+
+function startRecording() {
+  if (!recordingSupported()) { setStatus("This browser can't record video. Try Safari on iPhone or Chrome on Android."); return; }
+  discardTake();
+  if (!audio.isPlaying()) setPlaying(true); // a silent video isn't much use
+  const [src, sw, sh] = currentSource();
+  drawRecordFrame(rctx, src, sw, sh, null); // have a frame ready before capture starts
+  recorder = new Recorder(recCanvas, audio.getAudioStream(), {
+    maxSeconds: MAX_SECONDS,
+    onTick: s => { $("recBtn").textContent = `■ ${clock(s)}`; },
+    onDone: blob => { recorder = null; setRecordingUI(false); showTake(blob); },
+  });
+  try {
+    recorder.start();
+  } catch (e) {
+    recorder = null;
+    setStatus("Recording couldn't start" + (e && e.name ? ` (${e.name})` : "") + ".");
+    return;
+  }
+  setRecordingUI(true);
+  setStatus(`Recording. Tap ■ to stop (up to ${clock(MAX_SECONDS)}).`);
+}
+
+function showTake(blob) {
+  if (!blob.size) { setStatus("The recording came out empty. Try again, and keep the app in front while recording."); return; }
+  const file = videoFile(blob), url = URL.createObjectURL(file);
+  take = { file, url };
+  $("takeVideo").src = url;
+  $("saveBtn").href = url;
+  $("saveBtn").download = file.name;
+  $("shareBtn").hidden = !canShareFile(file);
+  $("take").hidden = false;
+  setStatus(isMp4(blob)
+    ? "Recording ready. Share it or save it to your phone."
+    : "Recording ready. This browser saved it as WebM, which Instagram may not accept. Other apps usually do.");
+}
+
+function discardTake() {
+  if (!take) return;
+  $("takeVideo").removeAttribute("src"); $("takeVideo").load();
+  URL.revokeObjectURL(take.url);
+  take = null;
+  $("take").hidden = true;
+}
+
+$("recBtn").addEventListener("click", () => { if (recorder) recorder.stop(); else startRecording(); });
+$("shareBtn").addEventListener("click", async () => {
+  if (!take) return;
+  const r = await shareFile(take.file);
+  if (r === "failed") setStatus("Sharing didn't work here. Use Save instead, then post it from your gallery.");
+});
+$("discardBtn").addEventListener("click", () => { discardTake(); setStatus("Recording discarded."); });
+// Phones stop drawing when the page is hidden, so end the take and keep what was recorded
+document.addEventListener("visibilitychange", () => { if (document.hidden && recorder) recorder.stop(); });
 $("liveBtn").addEventListener("click", toggleCamera);
 $("sampleBtn").addEventListener("click", useSample);
 $("photoBtn").addEventListener("click", () => $("photoInput").click());
