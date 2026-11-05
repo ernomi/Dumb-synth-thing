@@ -4,7 +4,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta name="theme-color" content="#10151c">
+<meta name="theme-color" content="#000000">
 <meta name="description" content="Point camera at things. Things are assigned a sound.">
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" href="icon-192.png" type="image/png">
@@ -22,33 +22,27 @@
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700&family=Instrument+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
 <style>
 /* Layout: an instrument faceplate. Camera stage on the left, voice strips on the right; stacks on phones. */
+@font-face {
+  font-family: "Faustus";
+  src: url("./Faustus.ttf") format("truetype");
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+}
 :root {
-  --bg: #eceff3;
-  --panel: #f8f9fb;
-  --ink: #16202b;
-  --muted: #5b6876;
-  --line: #d3d9e1;
-  --accent: #2a47d1;
-  --accent-ink: #ffffff;
-  --stage: #dfe4ea;
-  --v1: #2a47d1; --v2: #c2410c; --v3: #0f8a6b; --v4: #9333ea; --v5: #b7791f; --v6: #d6336c;
+  color-scheme: dark;
+  --bg: #000000;
+  --panel: #111111;
+  --ink: #d6d6d6;
+  --muted: #b0b0b0;
+  --line: #303030;
+  --accent: #8197ff;
+  --accent-ink: #000000;
+  --stage: #080808;
+  --v1: #8197ff; --v2: #ff8a5b; --v3: #3fd1a6; --v4: #c18bff; --v5: #f2c04e; --v6: #ff7aa8;
   --display: "Bricolage Grotesque", "Avenir Next", "Segoe UI", system-ui, sans-serif;
   --body: "Instrument Sans", "Helvetica Neue", Arial, system-ui, sans-serif;
   --mono: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, monospace;
-}
-@media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]) {
-    --bg: #10151c; --panel: #171e27; --ink: #e5eaf0; --muted: #94a1b0; --line: #2a3440;
-    --accent: #8197ff; --accent-ink: #0d1220; --stage: #0b0f14;
-    --v1: #8197ff; --v2: #ff8a5b; --v3: #3fd1a6; --v4: #c18bff; --v5: #f2c04e; --v6: #ff7aa8;
-    color-scheme: dark;
-  }
-}
-:root[data-theme="dark"] {
-  --bg: #10151c; --panel: #171e27; --ink: #e5eaf0; --muted: #94a1b0; --line: #2a3440;
-  --accent: #8197ff; --accent-ink: #0d1220; --stage: #0b0f14;
-  --v1: #8197ff; --v2: #ff8a5b; --v3: #3fd1a6; --v4: #c18bff; --v5: #f2c04e; --v6: #ff7aa8;
-  color-scheme: dark;
 }
 * { box-sizing: border-box; }
 body {
@@ -59,7 +53,7 @@ body {
 }
 .wrap { max-width: 1080px; margin: 0 auto; display: grid; gap: 18px; }
 header { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 6px 16px; }
-h1 { font-family: var(--display); font-weight: 700; font-size: clamp(26px, 5vw, 36px); letter-spacing: -0.02em; margin: 0; line-height: 1.1; text-wrap: balance; }
+h1 { font-family: "Faustus", var(--display); color: #ffdf57; font-weight: 400; font-size: clamp(26px, 5vw, 36px); letter-spacing: -0.02em; margin: 0; line-height: 1.1; text-wrap: balance; }
 .tagline { color: var(--muted); margin: 0; font-size: 14px; }
 .main { display: grid; gap: 18px; grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr); align-items: start; }
 @media (max-width: 820px) { .main { grid-template-columns: minmax(0, 1fr); } }
