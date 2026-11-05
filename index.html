@@ -906,7 +906,7 @@ input[type="range"] { accent-color: var(--accent); }
     } catch (e) {
       stream = null;
       const name = e && e.name;
-      if (inFrame) setStatus("The Claude viewer blocks camera access for pages like this one. Use Take photo here, or open the standalone file from an https:// address for live mode.");
+      if (inFrame) setStatus("Camera access blocked");
       else if (name === "NotAllowedError" || name === "SecurityError") setStatus("Camera permission was refused. Allow the camera for this site in your browser's site settings, then try again.");
       else if (name === "NotReadableError") setStatus("The camera is busy in another app. Close that app and try again.");
       else if (name === "NotFoundError") setStatus("No camera was found on this device.");
