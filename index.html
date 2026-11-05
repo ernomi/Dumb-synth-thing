@@ -13,9 +13,7 @@
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="Pocket wizard">
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700&family=Instrument+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<link rel="preload" href="assets/fonts/Alkhemikal.ttf" as="font" type="font/ttf" crossorigin>
 <link rel="stylesheet" href="css/styles.css">
 <script type="module" src="js/main.js"></script>
 </head>
@@ -78,7 +76,7 @@
         </label>
         <label for="polarity"><span class="label">Detect by</span>
           <select id="polarity">
-            <option value="auto">Outlines and contrast</option>
+            <option value="auto">Outlines + contrast</option>
             <option value="outline">Outlines only</option>
             <option value="dark">Darker than background</option>
             <option value="light">Lighter than background</option>
@@ -87,19 +85,19 @@
         <label for="volume"><span class="label">Volume</span>
           <input id="volume" type="range" min="0" max="1" step="0.01" value="0.7">
         </label>
-        <label for="attack"><span class="label">Attack <output id="attackOut">0.30 s</output></span>
+        <label for="attack" hidden><span class="label">Attack <output id="attackOut">0.30 s</output></span>
           <input id="attack" type="range" min="0.01" max="2" step="0.01" value="0.3">
         </label>
-        <label for="release"><span class="label">Release <output id="releaseOut">0.80 s</output></span>
+        <label for="release" hidden><span class="label">Release <output id="releaseOut">0.80 s</output></span>
           <input id="release" type="range" min="0.05" max="3" step="0.05" value="0.8">
         </label>
-        <label for="morph"><span class="label">Morph time <output id="morphOut">1.50 s</output></span>
+        <label for="morph" hidden><span class="label">Morph time <output id="morphOut">1.50 s</output></span>
           <input id="morph" type="range" min="0.1" max="5" step="0.1" value="1.5">
         </label>
-        <label for="drive"><span class="label">Overdrive <output id="driveOut">60%</output></span>
+        <label for="drive" hidden><span class="label">Overdrive <output id="driveOut">60%</output></span>
           <input id="drive" type="range" min="0" max="1" step="0.01" value="0.6">
         </label>
-        <label for="tone"><span class="label">Scene tone <output id="toneOut">100%</output></span>
+        <label for="tone" hidden><span class="label">Scene tone <output id="toneOut">100%</output></span>
           <input id="tone" type="range" min="0" max="1" step="0.01" value="1">
         </label>
       </div>
@@ -108,11 +106,10 @@
         <ul class="map">
           <li><b>Shape</b><span>Blends four waves by degree: round toward sine, box-like toward square, triangle-like toward triangle, spiky toward saw.</span></li>
           <li><b>Object color</b><span>Warm hues (red, orange, yellow) add overdrive. Cool hues (blue, teal) stay clean.</span></li>
-          <li><b>Scene color</b><span>A warm image adds 2nd harmonics and fuller low mids. A cool image adds 3rd harmonics, more treble and scooped mids.</span></li>
+          <li><b>Scene color</b><span>A warm image adds 2nd harmonics and a fuller sound. A cool image adds 3rd harmonics and a brighter sound.</span></li>
           <li><b>Size</b><span>Bigger objects play lower notes, smaller ones higher.</span></li>
           <li><b>Distance</b><span>Farther objects get more reverb, less treble and less volume.</span></li>
         </ul>
-        <p class="note-small">Distance is estimated from how high an object sits in the frame (lower means closer, as on a tabletop). Objects are found by contrast or by a closed outline, so even a white switch on a white wall can be picked up.</p>
       </div>
     </aside>
   </div>

@@ -2,7 +2,7 @@
 import { clamp, smoothstep as ss } from "./util.js";
 
 export const SCALES = { minpent: [0,3,5,7,10], majpent: [0,2,4,7,9], major: [0,2,4,5,7,9,11], chrom: [0,1,2,3,4,5,6,7,8,9,10,11] };
-const NOTE = ["C","C♯","D","D♯","E","F","F♯","G","G♯","A","A♯","B"];
+const NOTE = ["C","C#","D","D#","E","F","F#","G","G#","A","A#","B"]; // "#" rather than "♯": the UI font has no ♯
 
 // Harmonic tables, used to draw the little waveform previews
 export const NH = 32;

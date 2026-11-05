@@ -9,25 +9,39 @@
   font-weight: 400;
   font-display: swap;
 }
+/* All text except the title. Single weight, so no faux bold (see font-synthesis below). */
+@font-face {
+  font-family: "Alkhemikal";
+  src: url("../assets/fonts/Alkhemikal.ttf") format("truetype");
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+}
 :root {
+  font-synthesis: none;
   color-scheme: dark;
   --bg: #000000;
   --panel: #111111;
-  --ink: #d6d6d6;
-  --muted: #b0b0b0;
+  --ink: #cbbcff;    /* lavender: main text */
+  --muted: #9d8fc9;  /* dimmer lavender: labels and secondary text */
   --line: #303030;
   --accent: #8197ff;
   --accent-ink: #000000;
   --stage: #080808;
   --v1: #8197ff; --v2: #ff8a5b; --v3: #3fd1a6; --v4: #c18bff; --v5: #f2c04e; --v6: #ff7aa8;
-  --display: "Bricolage Grotesque", "Avenir Next", "Segoe UI", system-ui, sans-serif;
-  --body: "Instrument Sans", "Helvetica Neue", Arial, system-ui, sans-serif;
-  --mono: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, monospace;
+  --display: "Alkhemikal", system-ui, sans-serif;
+  --body: "Alkhemikal", system-ui, sans-serif;
+  --mono: "Alkhemikal", ui-monospace, monospace;
+  /* Text sizes. Alkhemikal runs small, so these are ~15% above the old fonts. */
+  --fs-xs: 12.5px;   /* small uppercase labels, badge, voice meta lines */
+  --fs-sm: 14.5px;   /* status, scene line, details, mapping notes */
+  --fs-md: 16px;     /* body text, buttons, dropdowns, voice names */
+  --fs-lg: 20px;     /* headings, note names */
 }
 * { box-sizing: border-box; }
 body {
   margin: 0;
-  background: var(--bg); color: var(--ink); font-family: var(--body); font-size: 15px; line-height: 1.5;
+  background: var(--bg); color: var(--ink); font-family: var(--body); font-size: var(--fs-md); line-height: 1.5;
   padding-left: max(16px, env(safe-area-inset-left, 0px));
   padding-right: max(16px, env(safe-area-inset-right, 0px));
   padding-block: 20px 40px;
@@ -35,13 +49,13 @@ body {
 .wrap { max-width: 1080px; margin: 0 auto; display: grid; gap: 18px; }
 header { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 6px 16px; }
 h1 { font-family: "Faustus", var(--display); color: #ffdf57; font-weight: 400; font-size: clamp(26px, 5vw, 36px); letter-spacing: -0.02em; margin: 0; line-height: 1.1; text-wrap: balance; }
-.tagline { color: var(--muted); margin: 0; font-size: 14px; }
+.tagline { color: var(--muted); margin: 0; font-size: var(--fs-md); }
 .main { display: grid; gap: 18px; grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr); align-items: start; }
 @media (max-width: 820px) { .main { grid-template-columns: minmax(0, 1fr); } }
 
 .stage { background: var(--stage); border-radius: 14px; overflow: hidden; position: relative; border: 1px solid var(--line); }
 #view { display: block; width: 100%; height: auto; }
-.badge { position: absolute; left: 10px; top: 10px; font-family: var(--mono); font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; background: var(--panel); color: var(--muted); padding: 3px 8px; border-radius: 6px; border: 1px solid var(--line); }
+.badge { position: absolute; left: 10px; top: 10px; font-family: var(--mono); font-size: var(--fs-xs); letter-spacing: 0.08em; text-transform: uppercase; background: var(--panel); color: var(--muted); padding: 3px 8px; border-radius: 6px; border: 1px solid var(--line); }
 .badge.live { color: var(--v2); }
 
 /* Equal-width buttons: as many columns as fit, every cell the same size */
@@ -49,7 +63,7 @@ h1 { font-family: "Faustus", var(--display); color: #ffdf57; font-weight: 400; f
 .controls > button, .controls > .btn { width: 100%; min-height: 44px; }
 .take .controls { grid-template-columns: repeat(3, minmax(0, 1fr)); width: min(100%, 360px); }
 button, .btn {
-  font: 600 14px/1.15 var(--body); padding: 11px 8px; border-radius: 10px; border: 1px solid var(--line);
+  font: 600 var(--fs-md)/1.15 var(--body); padding: 11px 8px; border-radius: 10px; border: 1px solid var(--line);
   background: var(--panel); color: var(--ink); cursor: pointer; display: inline-flex; align-items: center; justify-content: center; gap: 8px;
   text-align: center; white-space: nowrap;
 }
@@ -62,37 +76,61 @@ button:focus-visible, .btn:focus-visible, select:focus-visible, input:focus-visi
 #shapesBtn[aria-pressed="false"] { color: var(--muted); }
 .take { display: grid; gap: 8px; justify-items: start; }
 .take video { display: block; height: min(70vh, 640px); width: auto; max-width: 100%; aspect-ratio: 9 / 16; object-fit: contain; background: #000; border-radius: 14px; border: 1px solid var(--line); }
-.status { font-size: 13px; color: var(--muted); min-height: 1.5em; margin: 0; }
+.status { font-size: var(--fs-sm); color: var(--muted); min-height: 1.5em; margin: 0; }
 
 .panel { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 16px; display: grid; gap: 14px; min-width: 0; }
-.panel h2 { font-family: var(--display); font-weight: 500; font-size: 17px; margin: 0; }
-.label { font-family: var(--mono); font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
+.panel h2 { font-family: var(--display); font-weight: 500; font-size: var(--fs-lg); margin: 0; }
+.label { font-family: var(--mono); font-size: var(--fs-xs); letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
 #scope { width: 100%; height: 64px; display: block; border-radius: 8px; background: var(--bg); }
 
 .voices { display: grid; gap: 8px; }
-.voice { display: grid; grid-template-columns: 10px 56px minmax(0, 1fr) auto; align-items: center; gap: 10px; padding: 8px 10px; border-radius: 10px; background: var(--bg); }
+.voice { border-radius: 10px; background: var(--bg); border: 1px solid transparent; }
+.voice.open { border-color: var(--line); }
+/* The tappable summary row: reset the generic button look */
+.voice-head {
+  width: 100%; display: grid; grid-template-columns: 10px 56px minmax(0, 1fr) auto 12px; align-items: center; gap: 10px;
+  padding: 8px 10px; border: 0; border-radius: 10px; background: transparent; color: inherit;
+  font: 400 var(--fs-md)/1.5 var(--body); text-align: left; white-space: normal; justify-content: stretch;
+}
+@media (hover: hover) { .voice-head:hover { background: var(--panel); } } /* no sticky hover on phones */
+.voice-head > * { pointer-events: none; } /* taps always land on the button, even mid-update */
+.chev { color: var(--muted); font-size: 14px; line-height: 1; transition: transform 0.15s; }
+.voice.open .chev { transform: rotate(180deg); }
+.voice-details { padding: 2px 12px 12px 30px; }
+.voice-details dl { display: grid; grid-template-columns: 5.5em minmax(0, 1fr); gap: 6px 10px; margin: 0; font-size: var(--fs-sm); }
+.voice-details dt { font-family: var(--mono); font-size: var(--fs-xs); letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); padding-top: 1px; }
+.voice-details dd { margin: 0; font-variant-numeric: tabular-nums; }
+.voice-details dd .chip { display: inline-block; vertical-align: -1px; margin-right: 4px; }
+.voice-details .bars { display: grid; gap: 3px; }
+.bar { display: grid; grid-template-columns: 4.6em minmax(0, 1fr) 3em; align-items: center; gap: 8px; font-family: var(--mono); font-size: var(--fs-xs); }
+.bar-name { color: var(--muted); }
+.bar-track { height: 6px; border-radius: 3px; background: var(--line); overflow: hidden; }
+.bar-fill { display: block; height: 100%; border-radius: 3px; }
+.bar-val { text-align: right; }
 .dot { width: 10px; height: 10px; border-radius: 50%; }
 .voice svg { width: 56px; height: 22px; display: block; }
-.voice .what { min-width: 0; }
-.voice .shape { font-weight: 600; font-size: 14px; display: flex; align-items: center; gap: 6px; }
-.scene { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--muted); }
+.voice .what { min-width: 0; display: block; }
+.voice .meta { display: block; }
+.voice .shape { font-weight: 600; font-size: var(--fs-md); display: flex; align-items: center; gap: 6px; }
+.scene { display: flex; align-items: center; gap: 8px; font-size: var(--fs-sm); color: var(--muted); }
 .scene .chip { width: 14px; height: 14px; }
 .chip { width: 11px; height: 11px; border-radius: 3px; border: 1px solid var(--line); flex: none; }
-.voice .meta { font-family: var(--mono); font-size: 11px; color: var(--muted); font-variant-numeric: tabular-nums; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.voice .note { font-family: var(--mono); font-weight: 500; font-size: 18px; font-variant-numeric: tabular-nums; }
-.empty { color: var(--muted); font-size: 14px; padding: 8px 0; }
+.voice .meta { font-family: var(--mono); font-size: var(--fs-xs); color: var(--muted); font-variant-numeric: tabular-nums; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.voice .note { font-family: var(--mono); font-weight: 500; font-size: var(--fs-lg); font-variant-numeric: tabular-nums; }
+.empty { color: var(--muted); font-size: var(--fs-md); padding: 8px 0; }
 
 .settings { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 10px 12px; }
+@media (max-width: 400px) { .settings { grid-template-columns: minmax(0, 1fr); } } /* small phones: one per row so labels aren't cut off */
 .settings label { display: grid; gap: 4px; }
-select, input[type="range"] { width: 100%; font: 14px var(--body); }
+select, input[type="range"] { width: 100%; font: var(--fs-md) var(--body); }
 select { padding: 8px; border-radius: 8px; border: 1px solid var(--line); background: var(--bg); color: var(--ink); }
 input[type="range"] { accent-color: var(--accent); }
 
-.map { display: grid; gap: 6px; margin: 0; padding: 0; list-style: none; font-size: 13.5px; }
+.map { display: grid; gap: 6px; margin: 0; padding: 0; list-style: none; font-size: var(--fs-sm); }
 .map li { display: grid; grid-template-columns: 9.5em minmax(0, 1fr); gap: 8px; }
 .map b { font-weight: 600; }
 .map span { color: var(--muted); }
-.note-small { font-size: 12.5px; color: var(--muted); margin: 0; max-width: 65ch; }
+.note-small { font-size: var(--fs-sm); color: var(--muted); margin: 0; max-width: 65ch; }
 /* Visually hidden but still rendered: iOS won't decode video frames or open file pickers for display:none elements */
 .vh { position: fixed; left: 0; top: 0; width: 2px; height: 2px; opacity: 0.01; pointer-events: none; overflow: hidden; }
 .stage.drop { outline: 3px dashed var(--accent); outline-offset: -6px; }

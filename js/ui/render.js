@@ -1,34 +1,6 @@
-// Drawing: camera overlay, oscilloscope, voice list and scene description.
-import { blend, NH } from "../mapping.js";
-import { colors } from "./theme.js";
-
-const voiceColor = (tr) => colors[tr.id % colors.length];
-
-// ---------- voice list ----------
-function wavePath(p) {
-  const h = blend(p), pts = [], n = 64; let peak = 0; const ys = [];
-  for (let i = 0; i <= n; i++) {
-    let y = 0; const x = i / n;
-    for (let k = 1; k <= NH; k++) if (h[k]) y += h[k] * Math.sin(2 * Math.PI * k * x);
-    ys.push(y); peak = Math.max(peak, Math.abs(y));
-  }
-  ys.forEach((y, i) => pts.push((i / n * 56).toFixed(1) + "," + (11 - y / (peak || 1) * 9).toFixed(1)));
-  return "M" + pts.join(" L");
-}
-
-export function renderVoices(el, tracks) {
-  if (!tracks.length) { el.innerHTML = '<div class="empty">No shapes found. Try objects that contrast with a plain background, or change “Detect by”.</div>'; return; }
-  el.innerHTML = tracks.map(tr => {
-    const c = voiceColor(tr);
-    return `<div class="voice">
-      <span class="dot" style="background:${c}"></span>
-      <svg viewBox="0 0 56 22" aria-hidden="true"><path d="${wavePath(tr.p)}" fill="none" stroke="${c}" stroke-width="1.8" stroke-linejoin="round"/></svg>
-      <div class="what"><div class="shape"><span class="chip" style="background:rgb(${tr.obj.rgb.join(",")})"></span>${tr.p.name}</div>
-      <div class="meta">${tr.p.shown}</div>
-      <div class="meta">size ${(tr.f.frac * 100).toFixed(1)}% · far ${Math.round(tr.p.dist * 100)}% · drive ${Math.round(tr.p.drive * 100)}%</div></div>
-      <span class="note">${tr.p.note}</span></div>`;
-  }).join("");
-}
+// Drawing: camera overlay, oscilloscope and scene description.
+// (The voice list lives in voices.js.)
+import { colors, voiceColor } from "./theme.js";
 
 // ---------- scene ----------
 export function renderScene(el, sceneInfo, tone) {
@@ -79,8 +51,8 @@ export function drawOverlay(ctx, tracks, aw, ah, rect, unit) {
     ctx.closePath();
     ctx.globalAlpha = 0.16; ctx.fillStyle = c; ctx.fill();
     ctx.globalAlpha = 1; ctx.lineWidth = lw; ctx.strokeStyle = c; ctx.stroke();
-    const fs = Math.max(12, u / 42);
-    ctx.font = `500 ${fs}px "IBM Plex Mono", ui-monospace, monospace`;
+    const fs = Math.max(14, u / 36); // Alkhemikal runs small, so ~15% up from the old 12 / u/42
+    ctx.font = `${fs}px "Alkhemikal", system-ui, sans-serif`;
     const label = tr.p.note, tw = ctx.measureText(label).width;
     const lx = r.x + tr.obj.cx * r.w - tw / 2 - 6, ly = r.y + tr.obj.cy * r.h - fs * 0.75;
     ctx.fillStyle = c; roundRect(ctx, lx, ly, tw + 12, fs * 1.5, 6); ctx.fill();

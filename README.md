@@ -28,7 +28,8 @@ js/
     unlock.js           mobile/iOS audio unlock workarounds
   ui/
     settings.js         reads the settings panel controls
-    render.js           overlay, oscilloscope, voice list, scene text
+    render.js           overlay, oscilloscope, scene text
+    voices.js           voice list; tap a voice to open its details
     theme.js            colors from CSS custom properties
     pinch.js            two-finger pinch and trackpad pinch gestures
   sources/

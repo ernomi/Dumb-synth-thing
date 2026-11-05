@@ -1,6 +1,9 @@
 // Colors read from the CSS custom properties in css/styles.css.
 export const colors = Object.assign([], { ink: "", bg: "", panel: "", accent: "", line: "" });
 
+/** Each tracked object keeps one color for its outline, dot and waveform. */
+export const voiceColor = (tr) => colors[tr.id % colors.length];
+
 export function readColors() {
   const cs = getComputedStyle(document.documentElement);
   const voice = ["--v1","--v2","--v3","--v4","--v5","--v6"].map(v => cs.getPropertyValue(v).trim() || "#888");
