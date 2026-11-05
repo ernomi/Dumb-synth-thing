@@ -33,9 +33,9 @@
   --body: "Alkhemikal", system-ui, sans-serif;
   --mono: "Alkhemikal", ui-monospace, monospace;
   /* Text sizes. Alkhemikal runs small, so these are ~15% above the old fonts. */
-  --fs-xs: 12.5px;   /* small uppercase labels, badge, voice meta lines */
-  --fs-sm: 14.5px;   /* status, scene line, details, mapping notes */
-  --fs-md: 16px;     /* body text, buttons, dropdowns, voice names */
+  --fs-xs: 14.5px;   /* small uppercase labels, badge, voice meta lines */
+  --fs-sm: 16px;   /* status, scene line, details, mapping notes */
+  --fs-md: 16.5px;     /* body text, buttons, dropdowns, voice names */
   --fs-lg: 20px;     /* headings, note names */
 }
 * { box-sizing: border-box; }
@@ -48,7 +48,7 @@ body {
 }
 .wrap { max-width: 1080px; margin: 0 auto; display: grid; gap: 18px; }
 header { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 6px 16px; }
-h1 { font-family: "Faustus", var(--display); color: #ffdf57; font-weight: 400; font-size: clamp(26px, 5vw, 36px); letter-spacing: -0.02em; margin: 0; line-height: 1.1; text-wrap: balance; }
+h1 { font-family: "Faustus", var(--display); color: #ffdf57; font-weight: 400; font-size: clamp(36px, 5vw, 48px); letter-spacing: -0.02em; margin: 0; line-height: 1.1; text-wrap: balance; }
 .tagline { color: var(--muted); margin: 0; font-size: var(--fs-md); }
 .main { display: grid; gap: 18px; grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr); align-items: start; }
 @media (max-width: 820px) { .main { grid-template-columns: minmax(0, 1fr); } }
