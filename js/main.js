@@ -8,6 +8,8 @@ import { watchTheme } from "./ui/theme.js";
 import { renderVoices, renderScene, sizeView, drawOverlay, drawScope, drawSource, mirrorRect } from "./ui/render.js";
 import { loadSample } from "./sources/sample.js";
 import { startCamera, stopCamera, countCameras } from "./sources/camera.js";
+import { CameraZoom, zoomLabel } from "./sources/zoom.js";
+import { onPinch } from "./ui/pinch.js";
 import { loadImageFile } from "./sources/image-file.js";
 import { createRecordCanvas, drawRecordFrame } from "./recording/compose.js";
 import { Recorder, recordingSupported } from "./recording/recorder.js";
@@ -23,6 +25,7 @@ let mode = "sample";        // sample | photo | live
 let still = null;           // canvas for static modes
 let stream = null;
 let facing = "environment"; // which camera to use: "environment" (back) or "user" (front)
+const zoom = new CameraZoom();
 let lastAnalysis = 0;
 let analysisSize = { W: 256, H: 192 };
 let sceneInfo = null;
@@ -48,8 +51,8 @@ audio.configureAudio({
 });
 
 // ---------- analysis -> tracks -> sound ----------
-function analyze(src, w, h, staticMode) {
-  const r = analyzeImage(src, w, h, getSettings().polarity);
+function analyze(src, w, h, staticMode, crop) {
+  const r = analyzeImage(src, w, h, getSettings().polarity, crop);
   analysisSize = { W: r.W, H: r.H };
   sceneInfo = r.scene;
   audio.setSceneTone(r.scene.tone, mode === "live" ? 0.1 : 1);
@@ -70,23 +73,27 @@ const showVoices = () => renderVoices($("voices"), tracker.tracks);
 const showScene = () => renderScene($("scene"), sceneInfo, audio.toneAmount());
 
 // ---------- frame loop ----------
+/** What's on screen: the source and the part of it in view (smaller than the whole when zoomed). */
 function currentSource() {
-  if (mode === "live" && video.readyState >= 2 && video.videoWidth) return [video, video.videoWidth, video.videoHeight];
-  if (still) return [still, still.width, still.height];
-  return [null, 0, 0];
+  if (mode === "live" && video.readyState >= 2 && video.videoWidth) {
+    const sw = video.videoWidth, sh = video.videoHeight;
+    return [video, zoom.crop(sw, sh)];
+  }
+  if (still) return [still, { x: 0, y: 0, w: still.width, h: still.height }];
+  return [null, null];
 }
 
 function frame(now) {
-  const [src, sw, sh] = currentSource();
+  const [src, crop] = currentSource();
   const mirror = src === video && facing === "user"; // front camera shows as a mirror
   if (src === video) {
-    sizeView(view, sw, sh);
-    if (now - lastAnalysis > 120) { lastAnalysis = now; analyze(video, sw, sh, false); }
+    sizeView(view, crop.w, crop.h);
+    if (now - lastAnalysis > 120) { lastAnalysis = now; analyze(video, video.videoWidth, video.videoHeight, false, crop); }
   }
   const full = { x: 0, y: 0, w: view.width, h: view.height };
-  if (src) drawSource(vctx, src, full, mirror);
+  if (src) drawSource(vctx, src, crop, full, mirror);
   if (showShapes) drawOverlay(vctx, tracker.tracks, analysisSize.W, analysisSize.H, mirror ? mirrorRect(full) : full);
-  if (recorder) drawRecordFrame(rctx, src, sw, sh, showShapes ? { tracks: tracker.tracks, aw: analysisSize.W, ah: analysisSize.H } : null, mirror);
+  if (recorder) drawRecordFrame(rctx, src, crop, showShapes ? { tracks: tracker.tracks, aw: analysisSize.W, ah: analysisSize.H } : null, mirror);
   drawScope(sctx, audio.getAnalyser());
   requestAnimationFrame(frame);
 }
@@ -94,6 +101,7 @@ function frame(now) {
 // ---------- sources ----------
 function closeCamera() {
   stopCamera(stream); stream = null;
+  zoom.detach();
   $("liveBtn").textContent = "Live camera";
   $("flipBtn").hidden = true;
 }
@@ -131,8 +139,9 @@ async function openCamera() {
     stream = null; setStatus(e.message); return false;
   }
   mode = "live"; still = null; tracker.reset(); audio.stopAll();
+  zoom.attach(stream);
   if (audio.isPlaying()) { audio.unlockAudio(); setTimeout(audio.audioCheck, 800); }
-  $("liveBtn").textContent = "Stop camera"; setBadge("Live", true);
+  $("liveBtn").textContent = "Stop camera"; showZoom();
   setStatus(audio.isPlaying() ? "Live. Move objects around to change the sound." : "Live. Press Play to hear what the camera sees.");
   // Only offer flipping when there's a second camera to flip to
   countCameras().then(n => { if (stream) $("flipBtn").hidden = n < 2; });
@@ -146,7 +155,7 @@ async function flipCamera() {
   const previous = facing;
   facing = facing === "user" ? "environment" : "user";
   // Phones usually can't run both cameras at once, so release this one first
-  stopCamera(stream); stream = null;
+  stopCamera(stream); stream = null; zoom.detach();
   let ok = await openCamera();
   if (!ok) { facing = previous; ok = await openCamera(); }
   if (ok) setStatus(facing === "user" ? "Front camera." : "Back camera.");
@@ -226,8 +235,8 @@ async function startRecording() {
   } finally {
     startingRecording = false;
   }
-  const [src, sw, sh] = currentSource();
-  drawRecordFrame(rctx, src, sw, sh, null, src === video && facing === "user"); // have a frame ready before capture starts
+  const [src, crop] = currentSource();
+  drawRecordFrame(rctx, src, crop, null, src === video && facing === "user"); // have a frame ready before capture starts
   recorder = new Recorder(recCanvas, audio.getAudioStream(), {
     maxSeconds: MAX_SECONDS,
     onTick: s => { $("recBtn").textContent = `■ ${clock(s)}`; },
@@ -294,6 +303,17 @@ for (const id of ["photoInput", "uploadInput"]) {
 }
 
 const stageEl = document.querySelector(".stage");
+
+// Pinch the camera view to zoom; the badge shows the level when it isn't 1x
+function showZoom() {
+  if (mode !== "live") return;
+  setBadge(Math.abs(zoom.level - 1) < 0.05 ? "Live" : `Live ${zoomLabel(zoom.level)}`, true);
+}
+onPinch(stageEl, {
+  enabled: () => mode === "live" && !!stream,
+  start: () => zoom.level,
+  change: z => { zoom.set(z); showZoom(); },
+});
 stageEl.addEventListener("dragover", e => { e.preventDefault(); stageEl.classList.add("drop"); });
 stageEl.addEventListener("dragleave", () => stageEl.classList.remove("drop"));
 stageEl.addEventListener("drop", e => { e.preventDefault(); stageEl.classList.remove("drop"); const f = e.dataTransfer && e.dataTransfer.files[0]; if (f) openFile(f); });

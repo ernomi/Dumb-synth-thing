@@ -12,16 +12,16 @@ export function createRecordCanvas() {
 
 /**
  * @param src        video, image or canvas (or null for a black frame)
- * @param sw, sh     source size in pixels
+ * @param crop       { x, y, w, h } part of the source in view (all of it unless zoomed)
  * @param overlay    null, or { tracks, aw, ah } to draw shape outlines
  * @param mirror     flip left-to-right (front camera), matching the screen
  */
-export function drawRecordFrame(ctx, src, sw, sh, overlay, mirror) {
+export function drawRecordFrame(ctx, src, crop, overlay, mirror) {
   const W = ctx.canvas.width, H = ctx.canvas.height;
   ctx.fillStyle = "#000"; ctx.fillRect(0, 0, W, H);
-  if (!src || !sw || !sh) return;
-  const s = Math.max(W / sw, H / sh), w = sw * s, h = sh * s;
+  if (!src || !crop || !crop.w || !crop.h) return;
+  const s = Math.max(W / crop.w, H / crop.h), w = crop.w * s, h = crop.h * s;
   const rect = { x: (W - w) / 2, y: (H - h) / 2, w, h };
-  drawSource(ctx, src, rect, mirror);
+  drawSource(ctx, src, crop, rect, mirror);
   if (overlay) drawOverlay(ctx, overlay.tracks, overlay.aw, overlay.ah, mirror ? mirrorRect(rect) : rect, W * 1.5);
 }

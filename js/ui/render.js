@@ -41,12 +41,16 @@ export function renderScene(el, sceneInfo, tone) {
 }
 
 // ---------- camera view ----------
-/** Draw an image into `rect`, flipped left-to-right when `mirror` is set (front camera). */
-export function drawSource(ctx, src, rect, mirror) {
-  if (!mirror) { ctx.drawImage(src, rect.x, rect.y, rect.w, rect.h); return; }
+/**
+ * Draw the `crop` part of an image into `rect`, flipped left-to-right when
+ * `mirror` is set (front camera).
+ */
+export function drawSource(ctx, src, crop, rect, mirror) {
+  const draw = () => ctx.drawImage(src, crop.x, crop.y, crop.w, crop.h, rect.x, rect.y, rect.w, rect.h);
+  if (!mirror) { draw(); return; }
   ctx.save();
   ctx.translate(2 * rect.x + rect.w, 0); ctx.scale(-1, 1);
-  ctx.drawImage(src, rect.x, rect.y, rect.w, rect.h);
+  draw();
   ctx.restore();
 }
 

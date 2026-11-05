@@ -24,8 +24,10 @@ js/
     settings.js         reads the settings panel controls
     render.js           overlay, oscilloscope, voice list, scene text
     theme.js            colors from CSS custom properties
+    pinch.js            two-finger pinch and trackpad pinch gestures
   sources/
-    camera.js           live camera and wake lock
+    camera.js           live camera, front/back, wake lock
+    zoom.js             camera zoom: the camera's own when available, else a center crop
     image-file.js       load photos (EXIF rotation, HEIC message)
     sample.js           built-in sample scene
   recording/

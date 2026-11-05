@@ -21,7 +21,7 @@ export async function startCamera(video, facing = "environment") {
   let stream;
   try {
     try {
-      stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: facing }, width: { ideal: 960 } }, audio: false });
+      stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: facing }, width: { ideal: 960 }, zoom: true }, audio: false });
     } catch (e) {
       if (e && (e.name === "OverconstrainedError" || e.name === "NotFoundError")) stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
       else throw e;
