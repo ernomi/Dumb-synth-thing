@@ -3,8 +3,17 @@ const inFrame = (() => { try { return window.self !== window.top; } catch (e) { 
 
 let wakeLock = null;
 
-/** Start the back camera on `video`. Resolves to the MediaStream. */
-export async function startCamera(video) {
+/** How many cameras the device has (accurate only after permission is granted). */
+export async function countCameras() {
+  try { return (await navigator.mediaDevices.enumerateDevices()).filter(d => d.kind === "videoinput").length; }
+  catch (e) { return 0; }
+}
+
+/**
+ * Start a camera on `video`. Resolves to the MediaStream.
+ * @param facing  "environment" (back) or "user" (front)
+ */
+export async function startCamera(video, facing = "environment") {
   if (!window.isSecureContext)
     throw new Error("Live camera needs a secure page. Open this file from an https:// address, not from your phone's Files app or a file:// link.");
   if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia)
@@ -12,7 +21,7 @@ export async function startCamera(video) {
   let stream;
   try {
     try {
-      stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: "environment" }, width: { ideal: 960 } }, audio: false });
+      stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: facing }, width: { ideal: 960 } }, audio: false });
     } catch (e) {
       if (e && (e.name === "OverconstrainedError" || e.name === "NotFoundError")) stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
       else throw e;

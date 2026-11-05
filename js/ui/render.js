@@ -41,6 +41,18 @@ export function renderScene(el, sceneInfo, tone) {
 }
 
 // ---------- camera view ----------
+/** Draw an image into `rect`, flipped left-to-right when `mirror` is set (front camera). */
+export function drawSource(ctx, src, rect, mirror) {
+  if (!mirror) { ctx.drawImage(src, rect.x, rect.y, rect.w, rect.h); return; }
+  ctx.save();
+  ctx.translate(2 * rect.x + rect.w, 0); ctx.scale(-1, 1);
+  ctx.drawImage(src, rect.x, rect.y, rect.w, rect.h);
+  ctx.restore();
+}
+
+/** The same rect seen through a left-to-right flip, for drawOverlay (labels stay readable). */
+export const mirrorRect = r => ({ x: r.x + r.w, y: r.y, w: -r.w, h: r.h });
+
 export function sizeView(view, w, h) {
   const s = Math.min(1, 960 / w), cw = Math.round(w * s), ch = Math.round(h * s);
   if (view.width !== cw || view.height !== ch) { view.width = cw; view.height = ch; }

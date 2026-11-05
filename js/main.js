@@ -5,13 +5,14 @@ import { Tracker } from "./tracking.js";
 import * as audio from "./audio/engine.js";
 import { getSettings, bindSettings } from "./ui/settings.js";
 import { watchTheme } from "./ui/theme.js";
-import { renderVoices, renderScene, sizeView, drawOverlay, drawScope } from "./ui/render.js";
+import { renderVoices, renderScene, sizeView, drawOverlay, drawScope, drawSource, mirrorRect } from "./ui/render.js";
 import { loadSample } from "./sources/sample.js";
-import { startCamera, stopCamera } from "./sources/camera.js";
+import { startCamera, stopCamera, countCameras } from "./sources/camera.js";
 import { loadImageFile } from "./sources/image-file.js";
 import { createRecordCanvas, drawRecordFrame } from "./recording/compose.js";
 import { Recorder, recordingSupported } from "./recording/recorder.js";
 import { videoFile, isMp4, canShareFile, shareFile } from "./recording/share.js";
+import { finalizeRecording } from "./recording/finalize.js";
 
 const $ = (id) => document.getElementById(id);
 const view = $("view"), vctx = view.getContext("2d");
@@ -21,6 +22,7 @@ const video = $("video");
 let mode = "sample";        // sample | photo | live
 let still = null;           // canvas for static modes
 let stream = null;
+let facing = "environment"; // which camera to use: "environment" (back) or "user" (front)
 let lastAnalysis = 0;
 let analysisSize = { W: 256, H: 192 };
 let sceneInfo = null;
@@ -76,13 +78,15 @@ function currentSource() {
 
 function frame(now) {
   const [src, sw, sh] = currentSource();
+  const mirror = src === video && facing === "user"; // front camera shows as a mirror
   if (src === video) {
     sizeView(view, sw, sh);
     if (now - lastAnalysis > 120) { lastAnalysis = now; analyze(video, sw, sh, false); }
   }
-  if (src) vctx.drawImage(src, 0, 0, view.width, view.height);
-  if (showShapes) drawOverlay(vctx, tracker.tracks, analysisSize.W, analysisSize.H);
-  if (recorder) drawRecordFrame(rctx, src, sw, sh, showShapes ? { tracks: tracker.tracks, aw: analysisSize.W, ah: analysisSize.H } : null);
+  const full = { x: 0, y: 0, w: view.width, h: view.height };
+  if (src) drawSource(vctx, src, full, mirror);
+  if (showShapes) drawOverlay(vctx, tracker.tracks, analysisSize.W, analysisSize.H, mirror ? mirrorRect(full) : full);
+  if (recorder) drawRecordFrame(rctx, src, sw, sh, showShapes ? { tracks: tracker.tracks, aw: analysisSize.W, ah: analysisSize.H } : null, mirror);
   drawScope(sctx, audio.getAnalyser());
   requestAnimationFrame(frame);
 }
@@ -91,6 +95,7 @@ function frame(now) {
 function closeCamera() {
   stopCamera(stream); stream = null;
   $("liveBtn").textContent = "Live camera";
+  $("flipBtn").hidden = true;
 }
 
 function useStill(img, w, h, label) {
@@ -121,7 +126,7 @@ async function openCamera() {
   if (stream) return true;
   setStatus("Starting the camera…");
   try {
-    stream = await startCamera(video);
+    stream = await startCamera(video, facing);
   } catch (e) {
     stream = null; setStatus(e.message); return false;
   }
@@ -129,7 +134,24 @@ async function openCamera() {
   if (audio.isPlaying()) { audio.unlockAudio(); setTimeout(audio.audioCheck, 800); }
   $("liveBtn").textContent = "Stop camera"; setBadge("Live", true);
   setStatus(audio.isPlaying() ? "Live. Move objects around to change the sound." : "Live. Press Play to hear what the camera sees.");
+  // Only offer flipping when there's a second camera to flip to
+  countCameras().then(n => { if (stream) $("flipBtn").hidden = n < 2; });
   return true;
+}
+
+let flipping = false;
+async function flipCamera() {
+  if (!stream || flipping) return;
+  flipping = true;
+  const previous = facing;
+  facing = facing === "user" ? "environment" : "user";
+  // Phones usually can't run both cameras at once, so release this one first
+  stopCamera(stream); stream = null;
+  let ok = await openCamera();
+  if (!ok) { facing = previous; ok = await openCamera(); }
+  if (ok) setStatus(facing === "user" ? "Front camera." : "Back camera.");
+  else useSample();
+  flipping = false;
 }
 
 /** Resolves once the video element has a frame to draw (or after `ms`). */
@@ -156,12 +178,11 @@ async function openFile(file) {
 // ---------- controls ----------
 // Any tap retries a paused sound (iOS pauses audio when the camera starts or a call comes in)
 document.addEventListener("pointerdown", () => { if (audio.needsUnlock()) audio.unlockAudio(); }, true);
-for (const id of ["liveBtn", "sampleBtn", "photoBtn", "uploadBtn"])
+for (const id of ["liveBtn", "flipBtn", "sampleBtn", "photoBtn", "uploadBtn"])
   $(id).addEventListener("click", () => { if (audio.isPlaying()) audio.unlockAudio(); }, true);
 
 function setPlaying(playing) {
-  audio.unlockAudio();
-  setTimeout(audio.audioCheck, 800);
+  if (playing) { audio.unlockAudio(); setTimeout(audio.audioCheck, 800); }
   audio.setPlaying(playing);
   $("play").setAttribute("aria-pressed", String(playing));
   $("play").textContent = playing ? "■ Stop" : "▶ Play";
@@ -206,11 +227,18 @@ async function startRecording() {
     startingRecording = false;
   }
   const [src, sw, sh] = currentSource();
-  drawRecordFrame(rctx, src, sw, sh, null); // have a frame ready before capture starts
+  drawRecordFrame(rctx, src, sw, sh, null, src === video && facing === "user"); // have a frame ready before capture starts
   recorder = new Recorder(recCanvas, audio.getAudioStream(), {
     maxSeconds: MAX_SECONDS,
     onTick: s => { $("recBtn").textContent = `■ ${clock(s)}`; },
-    onDone: blob => { recorder = null; setRecordingUI(false); showTake(blob); },
+    onDone: async blob => {
+      recorder = null; setRecordingUI(false);
+      // A take is over: silence the synth, release the camera, back to the sample
+      setPlaying(false);
+      if (stream) { closeCamera(); await useSample(); }
+      setStatus("Finishing the video…");
+      showTake(await finalizeRecording(blob));
+    },
   });
   try {
     recorder.start();
@@ -255,6 +283,7 @@ $("discardBtn").addEventListener("click", () => { discardTake(); setStatus("Reco
 // Phones stop drawing when the page is hidden, so end the take and keep what was recorded
 document.addEventListener("visibilitychange", () => { if (document.hidden && recorder) recorder.stop(); });
 $("liveBtn").addEventListener("click", toggleCamera);
+$("flipBtn").addEventListener("click", flipCamera);
 $("sampleBtn").addEventListener("click", useSample);
 $("photoBtn").addEventListener("click", () => $("photoInput").click());
 $("uploadBtn").addEventListener("click", () => $("uploadInput").click());

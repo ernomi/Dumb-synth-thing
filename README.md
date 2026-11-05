@@ -31,7 +31,11 @@ js/
   recording/
     compose.js          draws the vertical 9:16 frame that gets recorded
     recorder.js         canvas + synth audio -> MP4 (or WebM) via MediaRecorder
+    finalize.js         rewrites the recording as a standard MP4 with the right length
     share.js            names the file and opens the phone's share sheet
+  vendor/
+    mediabunny-1.62.1.min.mjs   MP4 remuxing (MPL-2.0, see mediabunny-LICENSE.txt);
+                                pinned, loaded only after a recording finishes
 ```
 
 Modules marked *pure* don't touch the DOM, so they can be unit-tested in Node.
