@@ -6,7 +6,7 @@ import * as audio from "./audio/engine.js";
 import { getSettings, bindSettings } from "./ui/settings.js";
 import { watchTheme } from "./ui/theme.js";
 import { renderVoices, renderScene, sizeView, drawOverlay, drawScope } from "./ui/render.js";
-import { makeSample } from "./sources/sample.js";
+import { loadSample } from "./sources/sample.js";
 import { startCamera, stopCamera } from "./sources/camera.js";
 import { loadImageFile } from "./sources/image-file.js";
 import { createRecordCanvas, drawRecordFrame } from "./recording/compose.js";
@@ -25,7 +25,6 @@ let lastAnalysis = 0;
 let analysisSize = { W: 256, H: 192 };
 let sceneInfo = null;
 const tracker = new Tracker();
-const sample = makeSample();
 
 // Shape outlines on screen and in recordings; remembered per device
 let showShapes = true;
@@ -104,20 +103,43 @@ function useStill(img, w, h, label) {
   setStatus(n ? `Found ${n} shape${n > 1 ? "s" : ""}. ${audio.isPlaying() ? "Playing." : "Press Play to hear them."}` : "No shapes found in this image.");
 }
 
-const useSample = () => useStill(sample, 640, 480, "Sample scene");
+/** Show the built-in sample image. Resolves to false if it couldn't load. */
+async function useSample() {
+  let img;
+  try { img = await loadSample(); } catch (e) { setStatus(e.message); return false; }
+  useStill(img, img.width, img.height, "Sample scene");
+  return true;
+}
 
 async function toggleCamera() {
   if (stream) { closeCamera(); useSample(); return; }
+  await openCamera();
+}
+
+/** Start the live camera. Resolves to true on success; on failure the status explains why. */
+async function openCamera() {
+  if (stream) return true;
   setStatus("Starting the camera…");
   try {
     stream = await startCamera(video);
   } catch (e) {
-    stream = null; setStatus(e.message); return;
+    stream = null; setStatus(e.message); return false;
   }
   mode = "live"; still = null; tracker.reset(); audio.stopAll();
   if (audio.isPlaying()) { audio.unlockAudio(); setTimeout(audio.audioCheck, 800); }
   $("liveBtn").textContent = "Stop camera"; setBadge("Live", true);
   setStatus(audio.isPlaying() ? "Live. Move objects around to change the sound." : "Live. Press Play to hear what the camera sees.");
+  return true;
+}
+
+/** Resolves once the video element has a frame to draw (or after `ms`). */
+function videoReady(ms = 3000) {
+  if (video.readyState >= 2 && video.videoWidth) return Promise.resolve();
+  return new Promise(res => {
+    const done = () => { clearTimeout(t); video.removeEventListener("loadeddata", done); res(); };
+    const t = setTimeout(done, ms);
+    video.addEventListener("loadeddata", done);
+  });
 }
 
 async function openFile(file) {
@@ -169,10 +191,20 @@ function setRecordingUI(on) {
   $("recBtn").textContent = on ? "■ 0:00" : "● Record";
 }
 
-function startRecording() {
+let startingRecording = false;
+async function startRecording() {
+  if (startingRecording) return; // ignore extra taps while the camera starts
   if (!recordingSupported()) { setStatus("This browser can't record video. Try Safari on iPhone or Chrome on Android."); return; }
   discardTake();
-  if (!audio.isPlaying()) setPlaying(true); // a silent video isn't much use
+  // Start the sound first, while we're still inside the tap (phones require that)
+  if (!audio.isPlaying()) setPlaying(true);
+  startingRecording = true;
+  try {
+    if (!(await openCamera())) return; // status already says what went wrong
+    await videoReady();
+  } finally {
+    startingRecording = false;
+  }
   const [src, sw, sh] = currentSource();
   drawRecordFrame(rctx, src, sw, sh, null); // have a frame ready before capture starts
   recorder = new Recorder(recCanvas, audio.getAudioStream(), {
@@ -250,8 +282,12 @@ bindSettings({
 watchTheme(showVoices);
 
 // ---------- start ----------
-useSample();
-setStatus("Showing a built-in sample scene. Press Play to hear it.");
+loadSample().then(img => {
+  // Skip if the user already picked the camera or a photo while it loaded
+  if (mode !== "sample" || still || stream) return;
+  useStill(img, img.width, img.height, "Sample scene");
+  setStatus("Showing a built-in sample scene. Press Play to hear it.");
+}, e => setStatus(e.message));
 requestAnimationFrame(frame);
 
 // Offline support: stores the app on the phone after the first visit
