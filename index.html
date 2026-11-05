@@ -1,0 +1,999 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#10151c">
+<meta name="description" content="Point a camera at objects. Their shapes become sound.">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon-192.png" type="image/png">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Shapescape">
+<style>:root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}body{margin:0}[hidden]{display:none!important}</style>
+</head>
+<body>
+<title>Shapescape Synth</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700&family=Instrument+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: an instrument faceplate. Camera stage on the left, voice strips on the right; stacks on phones. */
+:root {
+  --bg: #eceff3;
+  --panel: #f8f9fb;
+  --ink: #16202b;
+  --muted: #5b6876;
+  --line: #d3d9e1;
+  --accent: #2a47d1;
+  --accent-ink: #ffffff;
+  --stage: #dfe4ea;
+  --v1: #2a47d1; --v2: #c2410c; --v3: #0f8a6b; --v4: #9333ea; --v5: #b7791f; --v6: #d6336c;
+  --display: "Bricolage Grotesque", "Avenir Next", "Segoe UI", system-ui, sans-serif;
+  --body: "Instrument Sans", "Helvetica Neue", Arial, system-ui, sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #10151c; --panel: #171e27; --ink: #e5eaf0; --muted: #94a1b0; --line: #2a3440;
+    --accent: #8197ff; --accent-ink: #0d1220; --stage: #0b0f14;
+    --v1: #8197ff; --v2: #ff8a5b; --v3: #3fd1a6; --v4: #c18bff; --v5: #f2c04e; --v6: #ff7aa8;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #10151c; --panel: #171e27; --ink: #e5eaf0; --muted: #94a1b0; --line: #2a3440;
+  --accent: #8197ff; --accent-ink: #0d1220; --stage: #0b0f14;
+  --v1: #8197ff; --v2: #ff8a5b; --v3: #3fd1a6; --v4: #c18bff; --v5: #f2c04e; --v6: #ff7aa8;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body {
+  background: var(--bg); color: var(--ink); font-family: var(--body); font-size: 15px; line-height: 1.5;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 20px 40px;
+}
+.wrap { max-width: 1080px; margin: 0 auto; display: grid; gap: 18px; }
+header { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 6px 16px; }
+h1 { font-family: var(--display); font-weight: 700; font-size: clamp(26px, 5vw, 36px); letter-spacing: -0.02em; margin: 0; line-height: 1.1; text-wrap: balance; }
+.tagline { color: var(--muted); margin: 0; font-size: 14px; }
+.main { display: grid; gap: 18px; grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr); align-items: start; }
+@media (max-width: 820px) { .main { grid-template-columns: minmax(0, 1fr); } }
+
+.stage { background: var(--stage); border-radius: 14px; overflow: hidden; position: relative; border: 1px solid var(--line); }
+#view { display: block; width: 100%; height: auto; }
+.badge { position: absolute; left: 10px; top: 10px; font-family: var(--mono); font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; background: var(--panel); color: var(--muted); padding: 3px 8px; border-radius: 6px; border: 1px solid var(--line); }
+.badge.live { color: var(--v2); }
+
+.controls { display: flex; flex-wrap: wrap; gap: 8px; }
+button, .btn {
+  font: 600 14px/1 var(--body); padding: 11px 14px; border-radius: 10px; border: 1px solid var(--line);
+  background: var(--panel); color: var(--ink); cursor: pointer; display: inline-flex; align-items: center; gap: 8px;
+}
+button:hover, .btn:hover { border-color: var(--muted); }
+button:focus-visible, .btn:focus-visible, select:focus-visible, input:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+#play { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); min-width: 112px; justify-content: center; }
+#play[aria-pressed="true"] { background: var(--ink); border-color: var(--ink); color: var(--bg); }
+.status { font-size: 13px; color: var(--muted); min-height: 1.5em; margin: 0; }
+
+.panel { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 16px; display: grid; gap: 14px; min-width: 0; }
+.panel h2 { font-family: var(--display); font-weight: 500; font-size: 17px; margin: 0; }
+.label { font-family: var(--mono); font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
+#scope { width: 100%; height: 64px; display: block; border-radius: 8px; background: var(--bg); }
+
+.voices { display: grid; gap: 8px; }
+.voice { display: grid; grid-template-columns: 10px 56px minmax(0, 1fr) auto; align-items: center; gap: 10px; padding: 8px 10px; border-radius: 10px; background: var(--bg); }
+.dot { width: 10px; height: 10px; border-radius: 50%; }
+.voice svg { width: 56px; height: 22px; display: block; }
+.voice .what { min-width: 0; }
+.voice .shape { font-weight: 600; font-size: 14px; display: flex; align-items: center; gap: 6px; }
+.scene { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--muted); }
+.scene .chip { width: 14px; height: 14px; }
+.chip { width: 11px; height: 11px; border-radius: 3px; border: 1px solid var(--line); flex: none; }
+.voice .meta { font-family: var(--mono); font-size: 11px; color: var(--muted); font-variant-numeric: tabular-nums; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.voice .note { font-family: var(--mono); font-weight: 500; font-size: 18px; font-variant-numeric: tabular-nums; }
+.empty { color: var(--muted); font-size: 14px; padding: 8px 0; }
+
+.settings { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 10px 12px; }
+.settings label { display: grid; gap: 4px; }
+select, input[type="range"] { width: 100%; font: 14px var(--body); }
+select { padding: 8px; border-radius: 8px; border: 1px solid var(--line); background: var(--bg); color: var(--ink); }
+input[type="range"] { accent-color: var(--accent); }
+
+.map { display: grid; gap: 6px; margin: 0; padding: 0; list-style: none; font-size: 13.5px; }
+.map li { display: grid; grid-template-columns: 9.5em minmax(0, 1fr); gap: 8px; }
+.map b { font-weight: 600; }
+.map span { color: var(--muted); }
+.note-small { font-size: 12.5px; color: var(--muted); margin: 0; max-width: 65ch; }
+/* Visually hidden but still rendered: iOS won't decode video frames or open file pickers for display:none elements */
+.vh { position: fixed; left: 0; top: 0; width: 2px; height: 2px; opacity: 0.01; pointer-events: none; overflow: hidden; }
+.stage.drop { outline: 3px dashed var(--accent); outline-offset: -6px; }
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+</style>
+
+<div class="wrap">
+  <header>
+    <h1>Shapescape Synth</h1>
+    <p class="tagline">Point a camera at objects. Their shapes become sound.</p>
+  </header>
+
+  <div class="main">
+    <section style="display:grid; gap:12px; min-width:0">
+      <div class="stage">
+        <canvas id="view" width="640" height="480" aria-label="Camera or photo view with detected shapes outlined"></canvas>
+        <span class="badge" id="badge">Sample scene</span>
+      </div>
+      <div class="controls">
+        <button id="play" aria-pressed="false" type="button">▶ Play</button>
+        <button id="liveBtn" type="button">Live camera</button>
+        <button id="photoBtn" type="button">Take photo</button>
+        <button id="uploadBtn" type="button">Upload image</button>
+        <input id="photoInput" class="vh" type="file" accept="image/*" capture="environment" tabindex="-1" aria-hidden="true">
+        <input id="uploadInput" class="vh" type="file" accept="image/*" tabindex="-1" aria-hidden="true">
+        <button id="sampleBtn" type="button">Sample scene</button>
+      </div>
+      <p class="status" id="status" role="status">Showing a built-in sample scene. Press Play to hear it.</p>
+    </section>
+
+    <aside class="panel">
+      <div style="display:grid; gap:6px">
+        <span class="label">Output</span>
+        <canvas id="scope" width="600" height="128" aria-label="Oscilloscope of the combined sound"></canvas>
+        <div class="scene" id="scene" aria-live="polite"></div>
+      </div>
+      <div style="display:grid; gap:8px">
+        <h2>Voices</h2>
+        <div class="voices" id="voices"></div>
+      </div>
+      <div class="settings">
+        <label for="scale"><span class="label">Scale</span>
+          <select id="scale">
+            <option value="minpent">Minor pentatonic</option>
+            <option value="majpent">Major pentatonic</option>
+            <option value="major">Major</option>
+            <option value="chrom">Chromatic</option>
+            <option value="free">Free (no snapping)</option>
+          </select>
+        </label>
+        <label for="polarity"><span class="label">Detect by</span>
+          <select id="polarity">
+            <option value="auto">Outlines and contrast</option>
+            <option value="outline">Outlines only</option>
+            <option value="dark">Darker than background</option>
+            <option value="light">Lighter than background</option>
+          </select>
+        </label>
+        <label for="volume"><span class="label">Volume</span>
+          <input id="volume" type="range" min="0" max="1" step="0.01" value="0.7">
+        </label>
+        <label for="attack"><span class="label">Attack <output id="attackOut">0.30 s</output></span>
+          <input id="attack" type="range" min="0.01" max="2" step="0.01" value="0.3">
+        </label>
+        <label for="release"><span class="label">Release <output id="releaseOut">0.80 s</output></span>
+          <input id="release" type="range" min="0.05" max="3" step="0.05" value="0.8">
+        </label>
+        <label for="morph"><span class="label">Morph time <output id="morphOut">1.50 s</output></span>
+          <input id="morph" type="range" min="0.1" max="5" step="0.1" value="1.5">
+        </label>
+        <label for="drive"><span class="label">Overdrive <output id="driveOut">60%</output></span>
+          <input id="drive" type="range" min="0" max="1" step="0.01" value="0.6">
+        </label>
+        <label for="tone"><span class="label">Scene tone <output id="toneOut">100%</output></span>
+          <input id="tone" type="range" min="0" max="1" step="0.01" value="1">
+        </label>
+      </div>
+      <div style="display:grid; gap:8px">
+        <span class="label">Mapping</span>
+        <ul class="map">
+          <li><b>Shape</b><span>Blends four waves by degree: round toward sine, box-like toward square, triangle-like toward triangle, spiky toward saw.</span></li>
+          <li><b>Object color</b><span>Warm hues (red, orange, yellow) add overdrive. Cool hues (blue, teal) stay clean.</span></li>
+          <li><b>Scene color</b><span>A warm image adds 2nd harmonics and fuller low mids. A cool image adds 3rd harmonics, more treble and scooped mids.</span></li>
+          <li><b>Size</b><span>Bigger objects play lower notes, smaller ones higher.</span></li>
+          <li><b>Distance</b><span>Farther objects get more reverb, less treble and less volume.</span></li>
+        </ul>
+        <p class="note-small">Distance is estimated from how high an object sits in the frame (lower means closer, as on a tabletop). Objects are found by contrast or by a closed outline, so even a white switch on a white wall can be picked up.</p>
+      </div>
+    </aside>
+  </div>
+</div>
+
+<video id="video" class="vh" playsinline muted autoplay aria-hidden="true"></video>
+
+<script>
+(() => {
+  const $ = (id) => document.getElementById(id);
+  const view = $("view"), vctx = view.getContext("2d");
+  const scope = $("scope"), sctx = scope.getContext("2d");
+  const video = $("video");
+  const work = document.createElement("canvas");
+  const wctx = work.getContext("2d", { willReadFrequently: true });
+  const WW = 256;           // analysis width in pixels
+  const MAX_VOICES = 5;
+
+  let mode = "sample";      // sample | photo | live
+  let still = null;         // canvas or image for static modes
+  let stream = null, wakeLock = null;
+  let lastAnalysis = 0, workH = 120;
+  let tracks = [], nextId = 0;
+  let colors = [];
+
+  // ---------- colors from theme tokens ----------
+  function readColors() {
+    const cs = getComputedStyle(document.documentElement);
+    colors = ["--v1","--v2","--v3","--v4","--v5","--v6"].map(v => cs.getPropertyValue(v).trim() || "#888");
+    colors.ink = cs.getPropertyValue("--ink").trim();
+    colors.bg = cs.getPropertyValue("--bg").trim();
+    colors.panel = cs.getPropertyValue("--panel").trim();
+    colors.accent = cs.getPropertyValue("--accent").trim();
+    colors.line = cs.getPropertyValue("--line").trim();
+  }
+  readColors();
+  try { matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => { readColors(); renderVoices(); }); } catch (e) {}
+  new MutationObserver(() => { readColors(); renderVoices(); }).observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
+
+  // ---------- sample scene ----------
+  function makeSample() {
+    const c = document.createElement("canvas"); c.width = 640; c.height = 480;
+    const x = c.getContext("2d");
+    const g = x.createLinearGradient(0, 0, 0, 480);
+    g.addColorStop(0, "#e9edf1"); g.addColorStop(1, "#cfd6de");
+    x.fillStyle = g; x.fillRect(0, 0, 640, 480);
+    // big warm circle, close
+    x.fillStyle = "#d4502a"; x.beginPath(); x.arc(175, 352, 92, 0, Math.PI * 2); x.fill();
+    // medium blue square, mid distance
+    x.fillStyle = "#2f5fd0"; x.save(); x.translate(430, 300); x.rotate(0.21); x.fillRect(-58, -58, 116, 116); x.restore();
+    // small golden triangle, far
+    x.fillStyle = "#d99a1e"; x.beginPath(); x.moveTo(310, 70); x.lineTo(345, 132); x.lineTo(275, 132); x.closePath(); x.fill();
+    // teal star, mid-far
+    x.fillStyle = "#138a8a"; x.beginPath();
+    for (let i = 0; i < 10; i++) {
+      const r = i % 2 ? 18 : 44, a = -Math.PI / 2 + i * Math.PI / 5;
+      x.lineTo(540 + r * Math.cos(a), 150 + r * Math.sin(a));
+    }
+    x.closePath(); x.fill();
+    return c;
+  }
+
+  // ---------- shape analysis ----------
+  function analyze(src, sw, sh) {
+    const W = WW, H = Math.max(8, Math.round(WW * sh / sw));
+    workH = H; work.width = W; work.height = H;
+    wctx.drawImage(src, 0, 0, W, H);
+    const r = analyzePixels(wctx.getImageData(0, 0, W, H).data, W, H, $("polarity").value);
+    updateScene(r.scene);
+    return r;
+  }
+  // ANALYSIS-START (pure functions, no DOM)
+  // Two detectors run side by side:
+  //  - contrast: Otsu threshold, for objects darker or lighter than the background
+  //  - outlines: Sobel edges, then every region fully enclosed by edges, which finds
+  //    same-colored objects with visible outlines (a white switch on a white wall)
+  // Duplicates and nested regions are merged, keeping the larger shape.
+  function analyzePixels(d, W, H, mode) {
+    const N = W * H, gray = new Uint8Array(N);
+    for (let i = 0; i < N; i++) gray[i] = (d[i*4] * 0.299 + d[i*4+1] * 0.587 + d[i*4+2] * 0.114) | 0;
+    const b = new Uint8Array(N);
+    for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+      let s = 0, n = 0;
+      for (let dy = -1; dy <= 1; dy++) { const yy = y + dy; if (yy < 0 || yy >= H) continue;
+        for (let dx = -1; dx <= 1; dx++) { const xx = x + dx; if (xx < 0 || xx >= W) continue; s += gray[yy*W+xx]; n++; } }
+      b[y*W+x] = s / n;
+    }
+    let cands = [];
+    if (mode !== "outline") cands = cands.concat(contrastObjects(b, d, W, H, mode));
+    if (mode === "auto" || mode === "outline") cands = cands.concat(outlineObjects(b, d, W, H));
+    cands.sort((p, q) => q.area - p.area);
+    const kept = [];
+    for (const c of cands) {
+      if (kept.length >= MAX_VOICES) break;
+      const pt = [c.cx * W, c.cy * H];
+      if (kept.some(k => pointInPoly(pt, k.hull))) continue; // same object or nested inside one
+      kept.push(c);
+    }
+    // Whole-frame color: warm scenes > 0, cool scenes < 0, grey or white about 0
+    let sr = 0, sg = 0, sb = 0;
+    for (let i = 0; i < N; i++) { sr += d[i*4]; sg += d[i*4+1]; sb += d[i*4+2]; }
+    const scene = colorInfo(sr / N, sg / N, sb / N);
+    scene.tone = Math.max(-1, Math.min(1, (scene.warmth * 2 - 1) * Math.min(1, scene.sat * 2.5)));
+    return { W, H, objects: kept, scene };
+  }
+  function contrastObjects(b, d, W, H, mode) {
+    const N = W * H, hist = new Float64Array(256); let mn = 255, mx = 0;
+    for (let i = 0; i < N; i++) { hist[b[i]]++; if (b[i] < mn) mn = b[i]; if (b[i] > mx) mx = b[i]; }
+    if (mx - mn < 28) return [];
+    let sum = 0; for (let t = 0; t < 256; t++) sum += t * hist[t];
+    let sumB = 0, wB = 0, best = 0, thr = 127;
+    for (let t = 0; t < 256; t++) {
+      wB += hist[t]; if (!wB) continue; const wF = N - wB; if (!wF) break;
+      sumB += t * hist[t]; const mB = sumB / wB, mF = (sum - sumB) / wF;
+      const between = wB * wF * (mB - mF) * (mB - mF);
+      if (between > best) { best = between; thr = t; }
+    }
+    let mask = new Uint8Array(N), dark = 0;
+    for (let i = 0; i < N; i++) if (b[i] <= thr) { mask[i] = 1; dark++; }
+    const invert = mode === "light" || (mode === "auto" && dark > N / 2);
+    if (invert) for (let i = 0; i < N; i++) mask[i] ^= 1;
+    mask = morph(morph(mask, W, H, false), W, H, true);
+    return components(mask, d, W, H, 0, 0.003);
+  }
+  function outlineObjects(b, d, W, H) {
+    const N = W * H, mag = new Float32Array(N);
+    for (let y = 1; y < H - 1; y++) for (let x = 1; x < W - 1; x++) {
+      const i = y * W + x;
+      const gx = -b[i-W-1] - 2*b[i-1] - b[i+W-1] + b[i-W+1] + 2*b[i+1] + b[i+W+1];
+      const gy = -b[i-W-1] - 2*b[i-W] - b[i-W+1] + b[i+W-1] + 2*b[i+W] + b[i+W+1];
+      mag[i] = Math.hypot(gx, gy);
+    }
+    const sorted = Float32Array.from(mag).sort();
+    const thr = Math.max(36, 0.25 * sorted[Math.floor(N * 0.99)]);
+    let edge = new Uint8Array(N);
+    for (let i = 0; i < N; i++) if (mag[i] > thr) edge[i] = 1;
+    edge = morph(edge, W, H, true); // close small gaps in outlines
+    // flood the background from the frame border; what it can't reach is enclosed
+    const bg = new Uint8Array(N), stack = new Int32Array(N); let sp = 0;
+    const push = i => { if (!edge[i] && !bg[i]) { bg[i] = 1; stack[sp++] = i; } };
+    for (let x = 0; x < W; x++) { push(x); push((H - 1) * W + x); }
+    for (let y = 0; y < H; y++) { push(y * W); push(y * W + W - 1); }
+    while (sp) {
+      const p = stack[--sp], x = p % W, y = (p / W) | 0;
+      if (x > 0) push(p - 1); if (x < W - 1) push(p + 1); if (y > 0) push(p - W); if (y < H - 1) push(p + W);
+    }
+    const inside = new Uint8Array(N);
+    for (let i = 0; i < N; i++) if (!edge[i] && !bg[i]) inside[i] = 1;
+    return components(inside, d, W, H, 1.5, 0.004); // grow back out to the middle of the outline
+  }
+  function components(mask, d, W, H, grow, minFrac) {
+    const N = W * H, lab = new Int32Array(N), stack = new Int32Array(N);
+    const out = []; let cur = 0;
+    for (let s = 0; s < N; s++) {
+      if (!mask[s] || lab[s]) continue;
+      cur++; let sp = 0; stack[sp++] = s; lab[s] = cur;
+      const pix = [];
+      while (sp) {
+        const p = stack[--sp]; pix.push(p);
+        const x = p % W, y = (p / W) | 0;
+        if (x > 0 && mask[p-1] && !lab[p-1]) { lab[p-1] = cur; stack[sp++] = p-1; }
+        if (x < W-1 && mask[p+1] && !lab[p+1]) { lab[p+1] = cur; stack[sp++] = p+1; }
+        if (y > 0 && mask[p-W] && !lab[p-W]) { lab[p-W] = cur; stack[sp++] = p-W; }
+        if (y < H-1 && mask[p+W] && !lab[p+W]) { lab[p+W] = cur; stack[sp++] = p+W; }
+      }
+      if (pix.length < N * minFrac) continue;
+      let x0 = W, x1 = 0, y0 = H, y1 = 0, r = 0, g = 0, bl = 0;
+      const pts = [];
+      for (const p of pix) {
+        const x = p % W, y = (p / W) | 0;
+        r += d[p*4]; g += d[p*4+1]; bl += d[p*4+2];
+        if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y;
+        const e = x === 0 || y === 0 || x === W-1 || y === H-1 || lab[p-1] !== cur || lab[p+1] !== cur || lab[p-W] !== cur || lab[p+W] !== cur;
+        if (e) pts.push([x - grow, y - grow], [x + 1 + grow, y - grow], [x - grow, y + 1 + grow], [x + 1 + grow, y + 1 + grow]);
+      }
+      if ((x1 - x0) > W * 0.92 || (y1 - y0) > H * 0.92) continue;
+      // fill holes: count bbox pixels the outside can't reach (a ring counts as a disc)
+      const bw = x1 - x0 + 3, bh = y1 - y0 + 3, loc = new Uint8Array(bw * bh), st = [];
+      for (const p of pix) loc[((p / W | 0) - y0 + 1) * bw + (p % W - x0 + 1)] = 1;
+      loc[0] = 2; st.push(0); let outside = 1;
+      while (st.length) {
+        const q = st.pop(), qx = q % bw, qy = (q / bw) | 0;
+        for (const n of [qx > 0 ? q - 1 : -1, qx < bw - 1 ? q + 1 : -1, qy > 0 ? q - bw : -1, qy < bh - 1 ? q + bw : -1])
+          if (n >= 0 && !loc[n]) { loc[n] = 2; outside++; st.push(n); }
+      }
+      const filled = bw * bh - outside;
+      const hull = convexHull(pts);
+      const P = perimeter(hull), HA = polyArea(hull);
+      const area = grow ? filled + Math.max(0, P - 2 * Math.PI * grow) * grow + Math.PI * grow * grow : filled;
+      if (area > N * 0.45) continue;
+      const n = pix.length;
+      let cx = 0, cy = 0; for (const q of hull) { cx += q[0]; cy += q[1]; }
+      const col = colorInfo(r / n, g / n, bl / n);
+      out.push({
+        area, frac: area / N, cx: cx / hull.length / W, cy: cy / hull.length / H, bottom: Math.min(1, (y1 + 1 + grow) / H), hull,
+        circ: Math.min(1, 4 * Math.PI * area / (P * P)),
+        solidity: Math.min(1, area / Math.max(1, HA)),
+        rect: Math.min(1, area / minRectArea(hull)), // square ≈ 1, circle ≈ 0.79, triangle ≈ 0.5
+        ...col,
+      });
+    }
+    return out;
+  }
+  // Average color of an object -> how warm it is and how much overdrive it earns
+  function colorInfo(r, g, b) {
+    const mx = Math.max(r, g, b), mn = Math.min(r, g, b), c = mx - mn;
+    let hue = 0;
+    if (c > 0) {
+      if (mx === r) hue = ((g - b) / c) % 6; else if (mx === g) hue = (b - r) / c + 2; else hue = (r - g) / c + 4;
+      hue *= 60; if (hue < 0) hue += 360;
+    }
+    const sat = mx > 0 ? Math.min(1, (c / mx) * 1.4) * Math.min(1, mx / 80) : 0;
+    const warmth = (1 + Math.cos((hue - 30) * Math.PI / 180)) / 2; // orange = 1, blue = 0
+    const drive = Math.max(0, Math.min(1, 0.3 + sat * (0.95 * warmth - 0.25)));
+    return { rgb: [r | 0, g | 0, b | 0], hue, sat, warmth, drive };
+  }
+  function pointInPoly(pt, P) {
+    let c = false;
+    for (let i = 0, j = P.length - 1; i < P.length; j = i++) {
+      const [ax, ay] = P[i], [bx, by] = P[j];
+      if ((ay > pt[1]) !== (by > pt[1]) && pt[0] < (bx - ax) * (pt[1] - ay) / (by - ay) + ax) c = !c;
+    }
+    return c;
+  }
+
+  function morph(m, W, H, dilate) {
+    const o = new Uint8Array(W * H);
+    for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+      let v = dilate ? 0 : 1;
+      for (let dy = -1; dy <= 1 && (dilate ? !v : v); dy++) for (let dx = -1; dx <= 1; dx++) {
+        const xx = x + dx, yy = y + dy;
+        const s = (xx < 0 || yy < 0 || xx >= W || yy >= H) ? 0 : m[yy*W+xx];
+        if (dilate && s) { v = 1; break; }
+        if (!dilate && !s) { v = 0; break; }
+      }
+      o[y*W+x] = v;
+    }
+    return o;
+  }
+  function convexHull(pts) {
+    pts.sort((a, b) => a[0] - b[0] || a[1] - b[1]);
+    const cross = (o, a, b) => (a[0]-o[0])*(b[1]-o[1]) - (a[1]-o[1])*(b[0]-o[0]);
+    const lo = [], up = [];
+    for (const p of pts) { while (lo.length >= 2 && cross(lo[lo.length-2], lo[lo.length-1], p) <= 0) lo.pop(); lo.push(p); }
+    for (let i = pts.length - 1; i >= 0; i--) { const p = pts[i]; while (up.length >= 2 && cross(up[up.length-2], up[up.length-1], p) <= 0) up.pop(); up.push(p); }
+    up.pop(); lo.pop(); return lo.concat(up);
+  }
+  function perimeter(h) { let s = 0; for (let i = 0; i < h.length; i++) { const a = h[i], b = h[(i+1) % h.length]; s += Math.hypot(a[0]-b[0], a[1]-b[1]); } return s; }
+  function polyArea(h) { let s = 0; for (let i = 0; i < h.length; i++) { const a = h[i], b = h[(i+1) % h.length]; s += a[0]*b[1] - b[0]*a[1]; } return Math.abs(s) / 2; }
+  function dp(p, eps) {
+    if (p.length < 3) return p;
+    const a = p[0], b = p[p.length-1], L = Math.hypot(b[0]-a[0], b[1]-a[1]) || 1;
+    let idx = 0, md = 0;
+    for (let i = 1; i < p.length - 1; i++) {
+      const dd = Math.abs((b[0]-a[0])*(a[1]-p[i][1]) - (a[0]-p[i][0])*(b[1]-a[1])) / L;
+      if (dd > md) { md = dd; idx = i; }
+    }
+    if (md <= eps) return [a, b];
+    const l = dp(p.slice(0, idx + 1), eps), r = dp(p.slice(idx), eps);
+    return l.slice(0, -1).concat(r);
+  }
+  function simplifyClosed(pts, eps) {
+    if (pts.length < 4) return pts;
+    let far = 0, fd = 0;
+    for (let i = 1; i < pts.length; i++) { const d = (pts[i][0]-pts[0][0])**2 + (pts[i][1]-pts[0][1])**2; if (d > fd) { fd = d; far = i; } }
+    const a = dp(pts.slice(0, far + 1), eps), b = dp(pts.slice(far).concat([pts[0]]), eps);
+    return a.slice(0, -1).concat(b.slice(0, -1));
+  }
+  // Merge vertices joined by short edges (a pixel corner often splits into two
+  // shallow turns), then count the turns that remain sharp.
+  function countCorners(poly, minEdge) {
+    let p = poly.map(v => v.slice());
+    let changed = true;
+    while (changed && p.length > 3) {
+      changed = false;
+      let si = -1, sl = minEdge;
+      for (let i = 0; i < p.length; i++) {
+        const a = p[i], b = p[(i + 1) % p.length], l = Math.hypot(a[0]-b[0], a[1]-b[1]);
+        if (l < sl) { sl = l; si = i; }
+      }
+      if (si >= 0) {
+        const j = (si + 1) % p.length, a = p[si], b = p[j];
+        p[si] = [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2];
+        p.splice(j, 1); changed = true;
+      }
+    }
+    let n = 0;
+    for (let i = 0; i < p.length; i++) {
+      const a = p[(i - 1 + p.length) % p.length], c = p[i], q = p[(i + 1) % p.length];
+      const a1 = Math.atan2(c[1]-a[1], c[0]-a[0]), a2 = Math.atan2(q[1]-c[1], q[0]-c[0]);
+      let t = Math.abs(a2 - a1); if (t > Math.PI) t = 2 * Math.PI - t;
+      if (t > 0.5) n++; // turn sharper than ~29 degrees
+    }
+    return n;
+  }
+  // Smallest-area rectangle around the hull, trying each hull edge as a side.
+  function minRectArea(h) {
+    let best = Infinity;
+    for (let i = 0; i < h.length; i++) {
+      const a = h[i], b = h[(i + 1) % h.length];
+      const L = Math.hypot(b[0]-a[0], b[1]-a[1]); if (L < 1e-6) continue;
+      const ux = (b[0]-a[0]) / L, uy = (b[1]-a[1]) / L;
+      let u0 = Infinity, u1 = -Infinity, v0 = Infinity, v1 = -Infinity;
+      for (const p of h) { const u = p[0]*ux + p[1]*uy, v = -p[0]*uy + p[1]*ux; if (u < u0) u0 = u; if (u > u1) u1 = u; if (v < v0) v0 = v; if (v > v1) v1 = v; }
+      best = Math.min(best, (u1 - u0) * (v1 - v0));
+    }
+    return best;
+  }
+  // ANALYSIS-END
+
+  // ---------- mapping: shape to sound ----------
+  const SCALES = { minpent: [0,3,5,7,10], majpent: [0,2,4,7,9], major: [0,2,4,5,7,9,11], chrom: [0,1,2,3,4,5,6,7,8,9,10,11] };
+  const NOTE = ["C","C♯","D","D♯","E","F","F♯","G","G♯","A","A♯","B"];
+  const NH = 32;
+  function harmonics(kind) {
+    const h = new Float32Array(NH + 1);
+    if (kind === "sine") h[1] = 1;
+    for (let n = 1; n <= NH; n++) {
+      if (kind === "square" && n % 2) h[n] = 1 / n;
+      if (kind === "triangle" && n % 2) h[n] = (((n - 1) / 2) % 2 ? -1 : 1) / (n * n);
+      if (kind === "saw") h[n] = (n % 2 ? 1 : -1) / n;
+    }
+    return h;
+  }
+  const WAVES = { sine: harmonics("sine"), square: harmonics("square"), triangle: harmonics("triangle"), saw: harmonics("saw") };
+
+  // Continuous shape-to-timbre mapping. Each wave gets a weight that changes
+  // smoothly with the measurements, so a squircle sits halfway between sine and
+  // square instead of snapping to one bucket.
+  const ss = x => { x = clamp(x, 0, 1); return x * x * (3 - 2 * x); };
+  const WAVE_NAMES = ["sine", "triangle", "square", "saw"];
+  function mapObject(f, count) {
+    const rnd = clamp((f.circ - 0.79) / 0.18, 0, 1); // linear: 0 for a square, 1 for a circle
+    const sq  = ss((f.rect - 0.80) / 0.14);      // 1 when it fills its box
+    const tri = ss((0.78 - f.rect) / 0.18);      // 1 when it fills half its box
+    const spk = ss((0.90 - f.solidity) / 0.22);  // 1 for stars and spikes
+    const rest = Math.max(0, 1 - sq - tri);
+    const ang = 1 - rnd;
+    const w = [rnd, ang * (tri + rest / 2), ang * (sq + rest / 2), 0].map(v => v * (1 - spk));
+    w[3] = spk;
+    const tot = w.reduce((x, y) => x + y, 0) || 1;
+    const weights = w.map(v => v / tot);
+    const order = weights.map((v, i) => [v, i]).sort((x, y) => y[0] - x[0]);
+    const label = { sine: "Round", triangle: "Triangle", square: "Square", saw: "Spiky" };
+    const name = label[WAVE_NAMES[order[0][1]]];
+    const shown = order.filter(([v], k) => k < 2 && v >= 0.1).map(([v, i]) => `${WAVE_NAMES[i]} ${Math.round(v * 100)}%`).join(" · ");
+    // size to pitch, on a log scale
+    const t = clamp((Math.log(f.frac) - Math.log(0.002)) / (Math.log(0.3) - Math.log(0.002)), 0, 1);
+    let midi = 86 - t * 50;
+    const sc = $("scale").value;
+    if (sc !== "free") midi = snap(Math.round(midi), SCALES[sc]);
+    const freq = 440 * Math.pow(2, (midi - 69) / 12);
+    const dist = clamp(1 - (f.bottom - 0.25) / 0.75, 0, 1);
+    const drive = f.drive * +$("drive").value;
+    return {
+      weights, name, shown, midi, freq, dist, drive,
+      note: sc === "free" ? Math.round(freq) + " Hz" : NOTE[((Math.round(midi) % 12) + 12) % 12] + (Math.floor(Math.round(midi) / 12) - 1),
+      cutoff: 700 * Math.pow(2, 4.2 * (1 - dist)),
+      level: (0.32 / Math.sqrt(Math.max(1, count))) * (1 - 0.55 * dist),
+      wet: 0.04 + 0.96 * dist,
+      dry: 1 - 0.7 * dist,
+    };
+  }
+  function snap(m, set) { for (let o = 0; o < 12; o++) { if (set.includes(((m + o) % 12 + 12) % 12)) return m + o; if (set.includes(((m - o) % 12 + 12) % 12)) return m - o; } return m; }
+  function clamp(v, a, b) { return Math.max(a, Math.min(b, v)); }
+  function blend(p) {
+    const h = new Float32Array(NH + 1);
+    WAVE_NAMES.forEach((k, i) => { const src = WAVES[k]; for (let n = 0; n <= NH; n++) h[n] += p.weights[i] * src[n]; });
+    return h;
+  }
+
+  // ---------- tracking ----------
+  // Measurements are smoothed over time per tracked object, so a shape that
+  // flickers between readings glides instead of jumping.
+  const FEATS = ["circ", "rect", "solidity", "frac", "bottom", "drive"];
+  function updateTracks(objects, staticMode) {
+    const count = objects.length;
+    const used = new Set();
+    for (const tr of tracks) {
+      let bi = -1, bd = 0.2;
+      objects.forEach((o, i) => { if (used.has(i)) return; const d = Math.hypot(o.cx - tr.obj.cx, o.cy - tr.obj.cy); if (d < bd) { bd = d; bi = i; } });
+      if (bi >= 0) {
+        used.add(bi); tr.obj = objects[bi]; tr.miss = 0;
+        const k = staticMode ? 1 : 0.2;
+        for (const f of FEATS) tr.f[f] += k * (tr.obj[f] - tr.f[f]);
+      } else tr.miss++;
+    }
+    tracks = tracks.filter(tr => tr.miss <= (staticMode ? 0 : 5));
+    objects.forEach((o, i) => {
+      if (used.has(i)) return;
+      const f = {}; for (const k of FEATS) f[k] = o[k];
+      tracks.push({ id: nextId++, obj: o, f, miss: 0 });
+    });
+    remap(count);
+  }
+  function remap(count) {
+    for (const tr of tracks) tr.p = mapObject(tr.f, count ?? tracks.length);
+    tracks.sort((a, b) => a.p.midi - b.p.midi);
+    syncVoices();
+    renderVoices();
+  }
+
+  // ---------- audio ----------
+  // Each voice: one pitch source drives four phase-locked oscillators
+  // (sine, triangle, square, saw). The shape crossfades their gains, so the
+  // waveform morphs without ever being swapped mid-cycle (the old crackle).
+  // Then: low-pass filter -> level -> envelope -> dry + reverb send.
+  let ac = null, master, reverb, analyser, playing = false;
+  const voices = new Map();
+  const TYPES = ["sine", "triangle", "square", "sawtooth"];
+  const TRIM = { sine: 1, triangle: 1, square: 0.55, sawtooth: 0.7 }; // even out loudness
+  const env = () => ({ attack: +$("attack").value, release: +$("release").value });
+  const morphTime = () => +$("morph").value / 3; // slider is roughly the time to settle
+  // Phones only let a page make sound after a tap, and iPhones mute web audio
+  // when the silent switch is on unless the page asks for "playback" audio.
+  // unlockAudio() runs at the start of every tap to cover all of that.
+  let silentEl = null;
+  function unlockAudio() {
+    try { if (navigator.audioSession) navigator.audioSession.type = "playback"; } catch (e) {}
+    initAudio();
+    if (ac.state !== "running") ac.resume().catch(() => {});
+    try { const b = ac.createBuffer(1, 1, ac.sampleRate), src = ac.createBufferSource(); src.buffer = b; src.connect(ac.destination); src.start(0); } catch (e) {}
+    // Older iPhones: a looping silent media element switches audio to the
+    // "playback" category, which ignores the silent switch.
+    try {
+      if (!silentEl) {
+        const sr = 8000, n = sr / 2, buf = new ArrayBuffer(44 + n * 2), v = new DataView(buf);
+        const w = (o, t) => { for (let i = 0; i < t.length; i++) v.setUint8(o + i, t.charCodeAt(i)); };
+        w(0, "RIFF"); v.setUint32(4, 36 + n * 2, true); w(8, "WAVEfmt "); v.setUint32(16, 16, true); v.setUint16(20, 1, true); v.setUint16(22, 1, true);
+        v.setUint32(24, sr, true); v.setUint32(28, sr * 2, true); v.setUint16(32, 2, true); v.setUint16(34, 16, true); w(36, "data"); v.setUint32(40, n * 2, true);
+        silentEl = document.createElement("audio"); silentEl.loop = true; silentEl.setAttribute("playsinline", ""); silentEl.setAttribute("x-webkit-airplay", "deny");
+        silentEl.src = URL.createObjectURL(new Blob([buf], { type: "audio/wav" }));
+      }
+      const pr = silentEl.play(); if (pr) pr.catch(() => {});
+    } catch (e) {}
+  }
+  function audioCheck() {
+    if (!ac || !playing) return;
+    if (ac.state !== "running") setStatus("The phone has paused the sound. Tap anywhere on the page to resume. On iPhone, also check the silent switch and volume.");
+  }
+  function initAudio() {
+    if (ac) return;
+    ac = new (window.AudioContext || window.webkitAudioContext)();
+    ac.onstatechange = () => { audioCheck(); if (ac.state === "running" && playing) syncVoices(); };
+    master = ac.createGain(); master.gain.value = +$("volume").value;
+    const limiter = ac.createDynamicsCompressor();
+    limiter.threshold.value = -8; limiter.knee.value = 6; limiter.ratio.value = 16;
+    limiter.attack.value = 0.005; limiter.release.value = 0.25;
+    analyser = ac.createAnalyser(); analyser.fftSize = 2048;
+    reverb = ac.createConvolver(); reverb.buffer = impulse(3.4);
+    const revIn = ac.createBiquadFilter(); revIn.type = "highpass"; revIn.frequency.value = 180;
+    revIn.connect(reverb); reverb.connect(master); reverb.input = revIn;
+    // Scene tone EQ: low-mid boost for warm scenes; treble lift and mid scoop for cool ones
+    const dc = ac.createBiquadFilter(); dc.type = "highpass"; dc.frequency.value = 25; dc.Q.value = 0.7;
+    eq.lowMid = ac.createBiquadFilter(); eq.lowMid.type = "peaking"; eq.lowMid.frequency.value = 280; eq.lowMid.Q.value = 0.9;
+    eq.scoop = ac.createBiquadFilter(); eq.scoop.type = "peaking"; eq.scoop.frequency.value = 1100; eq.scoop.Q.value = 0.7;
+    eq.bright = ac.createBiquadFilter(); eq.bright.type = "highshelf"; eq.bright.frequency.value = 3500;
+    master.connect(dc); dc.connect(eq.lowMid); eq.lowMid.connect(eq.scoop); eq.scoop.connect(eq.bright); eq.bright.connect(limiter);
+    limiter.connect(analyser); analyser.connect(ac.destination);
+    applyTone(true);
+  }
+  function impulse(sec) {
+    const sr = ac.sampleRate, len = Math.floor(sr * sec), buf = ac.createBuffer(2, len, sr);
+    const fade = Math.floor(sr * 0.004);
+    for (let ch = 0; ch < 2; ch++) {
+      const d = buf.getChannelData(ch);
+      for (let i = 0; i < len; i++) d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / len, 3.4) * Math.min(1, i / fade);
+    }
+    return buf;
+  }
+  function mixFor(p) { return TYPES.map((t, i) => p.weights[i] * TRIM[t]); }
+  // Overdrive: a tanh saturator blended in parallel with the clean signal.
+  // Warm-colored objects get more of it, cool ones less.
+  let driveCurve = null;
+  function curve() {
+    if (driveCurve) return driveCurve;
+    const n = 2048, c = new Float32Array(n), k = 4;
+    for (let i = 0; i < n; i++) { const x = i / (n - 1) * 2 - 1; c[i] = Math.tanh(k * x) / Math.tanh(k); }
+    return (driveCurve = c);
+  }
+  const driveMix = p => clamp(p.drive, 0, 1) * 0.6;
+  // Harmonic generators fed by each voice's raw oscillator mix.
+  // x² adds the 2nd harmonic (its DC offset is removed on the master bus);
+  // x³ adds the 3rd. Warm scenes get the 2nd, cool scenes the 3rd.
+  let h2Curve = null, h3Curve = null;
+  function harmCurves() {
+    if (h2Curve) return;
+    const n = 2049; h2Curve = new Float32Array(n); h3Curve = new Float32Array(n);
+    for (let i = 0; i < n; i++) { const x = i / (n - 1) * 2 - 1; h2Curve[i] = x * x; h3Curve[i] = x * x * x; }
+  }
+  const eq = {};
+  let sceneTone = 0, sceneInfo = null;
+  function toneAmt() { return clamp(sceneTone * +$("tone").value, -1, 1); }
+  function toneTargets() {
+    const t = toneAmt(), warm = Math.max(0, t), cool = Math.max(0, -t);
+    return { h2: 0.7 * warm, h3: 1.1 * cool, lowMid: 4 * warm, scoop: -4 * cool, bright: 6 * cool };
+  }
+  function applyTone(immediate) {
+    if (!ac) return;
+    const g = toneTargets(), t = ac.currentTime, tc = immediate ? 0.01 : 0.6;
+    setParam(eq.lowMid.gain, g.lowMid, t, tc);
+    setParam(eq.scoop.gain, g.scoop, t, tc);
+    setParam(eq.bright.gain, g.bright, t, tc);
+    for (const v of voices.values()) { setParam(v.h2.gain, g.h2, t, tc); setParam(v.h3.gain, g.h3, t, tc); }
+  }
+  function updateScene(sc) {
+    const k = mode === "live" ? 0.1 : 1;
+    sceneTone += k * (sc.tone - sceneTone);
+    sceneInfo = sc;
+    applyTone(false);
+    renderScene();
+  }
+  function renderScene() {
+    const el = $("scene"); if (!el || !sceneInfo) return;
+    const t = toneAmt(), pct = Math.round(Math.abs(t) * 100);
+    const desc = pct < 8 ? "Neutral. No extra harmonics or tone shaping."
+      : t > 0 ? `Warm ${pct}%. Adds 2nd harmonics and lifts the low mids.`
+      : `Cool ${pct}%. Adds 3rd harmonics, brightens the top and scoops the mids.`;
+    el.innerHTML = `<span class="chip" style="background:rgb(${sceneInfo.rgb.join(",")})"></span><span>${desc}</span>`;
+  }
+  function setParam(param, value, t, tc) {
+    // Smoothly glide from wherever the parameter is now
+    param.cancelScheduledValues(t);
+    param.setValueAtTime(param.value, t);
+    param.setTargetAtTime(value, t, tc);
+  }
+  function createVoice(p) {
+    const t = ac.currentTime;
+    const pre = ac.createGain(), clean = ac.createGain(), shaper = ac.createWaveShaper(), dirty = ac.createGain();
+    const filt = ac.createBiquadFilter(), level = ac.createGain(), envG = ac.createGain(), dry = ac.createGain(), wet = ac.createGain();
+    shaper.curve = curve(); shaper.oversample = "4x";
+    const m = driveMix(p); clean.gain.value = 1 - m; dirty.gain.value = m * 0.85;
+    filt.type = "lowpass"; filt.Q.value = 0.5; filt.frequency.value = p.cutoff;
+    level.gain.value = p.level; dry.gain.value = p.dry; wet.gain.value = p.wet;
+    let pitch = null;
+    if (ac.createConstantSource) { pitch = ac.createConstantSource(); pitch.offset.value = p.freq; }
+    const mix = mixFor(p);
+    const oscs = TYPES.map((type, i) => {
+      const o = ac.createOscillator(); o.type = type;
+      const g = ac.createGain(); g.gain.value = mix[i];
+      if (pitch) { o.frequency.value = 0; pitch.connect(o.frequency); } else o.frequency.value = p.freq;
+      o.connect(g); g.connect(pre);
+      return { o, g };
+    });
+    pre.connect(clean); clean.connect(filt);
+    pre.connect(shaper); shaper.connect(dirty); dirty.connect(filt);
+    harmCurves();
+    const s2 = ac.createWaveShaper(), s3 = ac.createWaveShaper(), h2 = ac.createGain(), h3 = ac.createGain();
+    s2.curve = h2Curve; s3.curve = h3Curve; s2.oversample = s3.oversample = "2x";
+    const tg = toneTargets(); h2.gain.value = tg.h2; h3.gain.value = tg.h3;
+    pre.connect(s2); s2.connect(h2); h2.connect(filt);
+    pre.connect(s3); s3.connect(h3); h3.connect(filt);
+    filt.connect(level); level.connect(envG); envG.connect(dry); envG.connect(wet);
+    dry.connect(master); wet.connect(reverb.input);
+    // Attack: ramp up from silence
+    const { attack } = env();
+    envG.gain.setValueAtTime(0, t);
+    envG.gain.linearRampToValueAtTime(1, t + Math.max(0.01, attack));
+    if (pitch) pitch.start(t);
+    oscs.forEach(x => x.o.start(t));
+    return { pitch, oscs, clean, dirty, h2, h3, filt, level, envG, dry, wet };
+  }
+  function syncVoices() {
+    if (!ac || !playing) return;
+    const t = ac.currentTime, live = new Set();
+    for (const tr of tracks) {
+      live.add(tr.id);
+      const p = tr.p;
+      let v = voices.get(tr.id);
+      if (!v) { voices.set(tr.id, createVoice(p)); continue; }
+      if (v.pitch) setParam(v.pitch.offset, p.freq, t, 0.08);
+      else v.oscs.forEach(x => setParam(x.o.frequency, p.freq, t, 0.08));
+      const mix = mixFor(p);
+      v.oscs.forEach((x, i) => setParam(x.g.gain, mix[i], t, morphTime()));
+      const m = driveMix(p);
+      setParam(v.clean.gain, 1 - m, t, 0.3);
+      setParam(v.dirty.gain, m * 0.85, t, 0.3);
+      setParam(v.filt.frequency, p.cutoff, t, 0.25);
+      setParam(v.level.gain, p.level, t, 0.2);
+      setParam(v.dry.gain, p.dry, t, 0.3);
+      setParam(v.wet.gain, p.wet, t, 0.3);
+    }
+    for (const [id, v] of voices) if (!live.has(id)) releaseVoice(id, v);
+  }
+  function releaseVoice(id, v) {
+    const t = ac.currentTime, rel = Math.max(0.05, env().release);
+    const g = v.envG.gain;
+    if (g.cancelAndHoldAtTime) g.cancelAndHoldAtTime(t);
+    else { const now = g.value; g.cancelScheduledValues(t); g.setValueAtTime(now, t); }
+    g.linearRampToValueAtTime(0, t + rel);
+    const end = t + rel + 0.05;
+    v.oscs.forEach(x => { try { x.o.stop(end); } catch (e) {} });
+    if (v.pitch) { try { v.pitch.stop(end); } catch (e) {} }
+    setTimeout(() => { try { v.dry.disconnect(); v.wet.disconnect(); } catch (e) {} }, (rel + 0.3) * 1000);
+    voices.delete(id);
+  }
+  function stopAll() { if (!ac) return; for (const [id, v] of voices) releaseVoice(id, v); }
+
+  // ---------- rendering ----------
+  function wavePath(p) {
+    const h = blend(p), pts = [], n = 64; let peak = 0; const ys = [];
+    for (let i = 0; i <= n; i++) { let y = 0; const x = i / n; for (let k = 1; k <= NH; k++) if (h[k]) y += h[k] * Math.sin(2 * Math.PI * k * x); ys.push(y); peak = Math.max(peak, Math.abs(y)); }
+    ys.forEach((y, i) => pts.push((i / n * 56).toFixed(1) + "," + (11 - y / (peak || 1) * 9).toFixed(1)));
+    return "M" + pts.join(" L");
+  }
+  function renderVoices() {
+    const el = $("voices");
+    if (!tracks.length) { el.innerHTML = '<div class="empty">No shapes found. Try objects that contrast with a plain background, or change “Detect by”.</div>'; return; }
+    el.innerHTML = tracks.map(tr => {
+      const c = colors[tr.id % colors.length];
+      return `<div class="voice">
+        <span class="dot" style="background:${c}"></span>
+        <svg viewBox="0 0 56 22" aria-hidden="true"><path d="${wavePath(tr.p)}" fill="none" stroke="${c}" stroke-width="1.8" stroke-linejoin="round"/></svg>
+        <div class="what"><div class="shape"><span class="chip" style="background:rgb(${tr.obj.rgb.join(",")})"></span>${tr.p.name}</div>
+        <div class="meta">${tr.p.shown}</div>
+        <div class="meta">size ${(tr.f.frac * 100).toFixed(1)}% · far ${Math.round(tr.p.dist * 100)}% · drive ${Math.round(tr.p.drive * 100)}%</div></div>
+        <span class="note">${tr.p.note}</span></div>`;
+    }).join("");
+  }
+  function sizeView(w, h) {
+    const s = Math.min(1, 960 / w), cw = Math.round(w * s), ch = Math.round(h * s);
+    if (view.width !== cw || view.height !== ch) { view.width = cw; view.height = ch; }
+  }
+  function drawOverlay() {
+    const sx = view.width / WW, sy = view.height / workH;
+    const lw = Math.max(2, view.width / 260);
+    for (const tr of tracks) {
+      const c = colors[tr.id % colors.length], h = tr.obj.hull;
+      vctx.beginPath();
+      h.forEach((p, i) => i ? vctx.lineTo(p[0] * sx, p[1] * sy) : vctx.moveTo(p[0] * sx, p[1] * sy));
+      vctx.closePath();
+      vctx.globalAlpha = 0.16; vctx.fillStyle = c; vctx.fill();
+      vctx.globalAlpha = 1; vctx.lineWidth = lw; vctx.strokeStyle = c; vctx.stroke();
+      const fs = Math.max(12, view.width / 42);
+      vctx.font = `500 ${fs}px "IBM Plex Mono", ui-monospace, monospace`;
+      const label = tr.p.note, tw = vctx.measureText(label).width;
+      const lx = tr.obj.cx * view.width - tw / 2 - 6, ly = tr.obj.cy * view.height - fs * 0.75;
+      vctx.fillStyle = c; roundRect(lx, ly, tw + 12, fs * 1.5, 6); vctx.fill();
+      vctx.fillStyle = "#ffffff"; vctx.textBaseline = "middle"; vctx.fillText(label, lx + 6, ly + fs * 0.76);
+    }
+  }
+  function roundRect(x, y, w, h, r) { vctx.beginPath(); vctx.moveTo(x + r, y); vctx.arcTo(x + w, y, x + w, y + h, r); vctx.arcTo(x + w, y + h, x, y + h, r); vctx.arcTo(x, y + h, x, y, r); vctx.arcTo(x, y, x + w, y, r); vctx.closePath(); }
+  const scopeBuf = new Float32Array(2048);
+  function drawScope() {
+    const w = scope.width, h = scope.height;
+    sctx.clearRect(0, 0, w, h);
+    sctx.strokeStyle = colors.line; sctx.lineWidth = 1;
+    sctx.beginPath(); sctx.moveTo(0, h / 2); sctx.lineTo(w, h / 2); sctx.stroke();
+    if (!ac || !playing) return;
+    analyser.getFloatTimeDomainData(scopeBuf);
+    let start = 0; for (let i = 1; i < 1024; i++) if (scopeBuf[i - 1] < 0 && scopeBuf[i] >= 0) { start = i; break; }
+    sctx.strokeStyle = colors.accent; sctx.lineWidth = 2.5; sctx.beginPath();
+    for (let i = 0; i < 1024; i++) { const x = i / 1023 * w, y = h / 2 - scopeBuf[start + i] * h * 0.9; i ? sctx.lineTo(x, y) : sctx.moveTo(x, y); }
+    sctx.stroke();
+  }
+  function frame(now) {
+    if (mode === "live" && video.readyState >= 2 && video.videoWidth) {
+      sizeView(video.videoWidth, video.videoHeight);
+      vctx.drawImage(video, 0, 0, view.width, view.height);
+      if (now - lastAnalysis > 120) { lastAnalysis = now; updateTracks(analyze(video, video.videoWidth, video.videoHeight).objects, false); }
+    } else if (still) {
+      vctx.drawImage(still, 0, 0, view.width, view.height);
+    }
+    drawOverlay(); drawScope();
+    requestAnimationFrame(frame);
+  }
+
+  // ---------- sources ----------
+  function setStatus(t) { $("status").textContent = t; }
+  function setBadge(t, live) { const b = $("badge"); b.textContent = t; b.classList.toggle("live", !!live); }
+  function stopCamera() {
+    if (stream) { stream.getTracks().forEach(t => t.stop()); stream = null; }
+    if (wakeLock) { wakeLock.release().catch(() => {}); wakeLock = null; }
+    $("liveBtn").textContent = "Live camera";
+  }
+  function useStill(img, w, h, label) {
+    stopCamera(); mode = label === "Sample scene" ? "sample" : "photo";
+    still = img; sizeView(w, h); tracks = []; stopAll();
+    updateTracks(analyze(img, w, h).objects, true);
+    setBadge(label);
+    setStatus(tracks.length ? `Found ${tracks.length} shape${tracks.length > 1 ? "s" : ""}. ${playing ? "Playing." : "Press Play to hear them."}` : "No shapes found in this image.");
+  }
+  const inFrame = (() => { try { return window.self !== window.top; } catch (e) { return true; } })();
+  async function startCamera() {
+    if (stream) { stopCamera(); useStill(sample, 640, 480, "Sample scene"); return; }
+    if (!window.isSecureContext) {
+      setStatus("Live camera needs a secure page. Open this file from an https:// address, not from your phone's Files app or a file:// link.");
+      return;
+    }
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+      setStatus("This browser doesn't offer camera access to web pages. Try Chrome on Android or Safari on iPhone.");
+      return;
+    }
+    setStatus("Starting the camera…");
+    try {
+      try {
+        stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: "environment" }, width: { ideal: 960 } }, audio: false });
+      } catch (e) {
+        if (e && (e.name === "OverconstrainedError" || e.name === "NotFoundError")) stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
+        else throw e;
+      }
+      video.muted = true; video.setAttribute("playsinline", ""); video.srcObject = stream;
+      await video.play().catch(() => {});
+      mode = "live"; still = null; tracks = []; stopAll();
+      if (playing) { unlockAudio(); setTimeout(audioCheck, 800); }
+      $("liveBtn").textContent = "Stop camera"; setBadge("Live", true);
+      setStatus(playing ? "Live. Move objects around to change the sound." : "Live. Press Play to hear what the camera sees.");
+      try { if (navigator.wakeLock) wakeLock = await navigator.wakeLock.request("screen"); } catch (e) {}
+    } catch (e) {
+      stream = null;
+      const name = e && e.name;
+      if (inFrame) setStatus("The Claude viewer blocks camera access for pages like this one. Use Take photo here, or open the standalone file from an https:// address for live mode.");
+      else if (name === "NotAllowedError" || name === "SecurityError") setStatus("Camera permission was refused. Allow the camera for this site in your browser's site settings, then try again.");
+      else if (name === "NotReadableError") setStatus("The camera is busy in another app. Close that app and try again.");
+      else if (name === "NotFoundError") setStatus("No camera was found on this device.");
+      else setStatus("The camera couldn't start" + (name ? " (" + name + ")" : "") + ".");
+    }
+  }
+  async function loadFile(file) {
+    if (!file) return;
+    setStatus("Opening image…");
+    const done = (src, w, h) => {
+      const sc = Math.min(1, 1280 / Math.max(w, h));
+      const c = document.createElement("canvas"); c.width = Math.max(1, Math.round(w * sc)); c.height = Math.max(1, Math.round(h * sc));
+      c.getContext("2d").drawImage(src, 0, 0, c.width, c.height);
+      useStill(c, c.width, c.height, "Photo");
+    };
+    // 1) createImageBitmap reads the file directly and honours EXIF rotation
+    if (window.createImageBitmap) {
+      try {
+        let bmp;
+        try { bmp = await createImageBitmap(file, { imageOrientation: "from-image" }); }
+        catch (e) { bmp = await createImageBitmap(file); }
+        done(bmp, bmp.width, bmp.height); if (bmp.close) bmp.close(); return;
+      } catch (e) { /* fall through */ }
+    }
+    // 2) Read as a data: URL into an <img>
+    try {
+      const url = await new Promise((res, rej) => { const r = new FileReader(); r.onload = () => res(r.result); r.onerror = () => rej(r.error); r.readAsDataURL(file); });
+      const img = await new Promise((res, rej) => { const i = new Image(); i.onload = () => res(i); i.onerror = rej; i.src = url; });
+      done(img, img.naturalWidth, img.naturalHeight); return;
+    } catch (e) { /* fall through */ }
+    const heic = /heic|heif/i.test(file.type) || /\.hei[cf]$/i.test(file.name || "");
+    setStatus(heic
+      ? "This browser can't read HEIC photos. On iPhone, set Settings › Camera › Formats to Most Compatible, or upload a JPEG or PNG."
+      : "That file couldn't be opened as an image" + (file.type ? " (" + file.type + ")" : "") + ". Try a JPEG or PNG.");
+  }
+
+  // ---------- controls ----------
+  // Any tap retries a paused sound (iOS pauses audio when the camera starts or a call comes in)
+  document.addEventListener("pointerdown", () => { if (playing && ac && ac.state !== "running") unlockAudio(); }, true);
+  for (const id of ["liveBtn", "sampleBtn", "photoBtn", "uploadBtn"]) $(id).addEventListener("click", () => { if (playing) unlockAudio(); }, true);
+  $("play").addEventListener("click", () => {
+    unlockAudio();
+    setTimeout(audioCheck, 800);
+    playing = !playing;
+    $("play").setAttribute("aria-pressed", String(playing));
+    $("play").textContent = playing ? "■ Stop" : "▶ Play";
+    if (playing) syncVoices(); else stopAll();
+    if (playing && mode !== "live") setStatus(tracks.length ? "Playing. Try another photo, or the live camera." : "Playing, but no shapes are in view.");
+    if (!playing) setStatus("Stopped.");
+  });
+  $("liveBtn").addEventListener("click", startCamera);
+  $("sampleBtn").addEventListener("click", () => useStill(sample, 640, 480, "Sample scene"));
+  $("photoBtn").addEventListener("click", () => $("photoInput").click());
+  $("uploadBtn").addEventListener("click", () => $("uploadInput").click());
+  for (const id of ["photoInput", "uploadInput"]) {
+    const inp = $(id);
+    const take = () => { const f = inp.files && inp.files[0]; if (f) loadFile(f); inp.value = ""; };
+    inp.addEventListener("change", take); inp.addEventListener("input", take);
+  }
+  const stageEl = document.querySelector(".stage");
+  stageEl.addEventListener("dragover", e => { e.preventDefault(); stageEl.classList.add("drop"); });
+  stageEl.addEventListener("dragleave", () => stageEl.classList.remove("drop"));
+  stageEl.addEventListener("drop", e => { e.preventDefault(); stageEl.classList.remove("drop"); const f = e.dataTransfer && e.dataTransfer.files[0]; if (f) loadFile(f); });
+  document.addEventListener("paste", e => { const it = [...(e.clipboardData ? e.clipboardData.items : [])].find(i => i.type.startsWith("image/")); if (it) loadFile(it.getAsFile()); });
+  const fmt = v => (+v).toFixed(2) + " s";
+  $("attack").addEventListener("input", e => { $("attackOut").textContent = fmt(e.target.value); });
+  $("release").addEventListener("input", e => { $("releaseOut").textContent = fmt(e.target.value); });
+  $("morph").addEventListener("input", e => { $("morphOut").textContent = fmt(e.target.value); });
+  $("tone").addEventListener("input", e => { $("toneOut").textContent = Math.round(e.target.value * 100) + "%"; applyTone(false); renderScene(); });
+  $("drive").addEventListener("input", e => { $("driveOut").textContent = Math.round(e.target.value * 100) + "%"; remap(); });
+  $("volume").addEventListener("input", e => { if (master) master.gain.setTargetAtTime(+e.target.value, ac.currentTime, 0.05); });
+  $("scale").addEventListener("change", () => remap());
+  $("polarity").addEventListener("change", () => { if (still) { tracks = []; stopAll(); updateTracks(analyze(still, still.width, still.height).objects, true); } });
+
+  const sample = makeSample();
+  useStill(sample, 640, 480, "Sample scene");
+  setStatus("Showing a built-in sample scene. Press Play to hear it.");
+  requestAnimationFrame(frame);
+})();
+</script>
+
+<script>
+  // Offline support: stores the app on the phone after the first visit
+  if ("serviceWorker" in navigator && location.protocol === "https:") {
+    window.addEventListener("load", () => navigator.serviceWorker.register("sw.js").catch(() => {}));
+  }
+</script>
+</body>
+</html>
