@@ -6,7 +6,13 @@ Point the camera at things. Things become sound.
 
 ```
 index.html              markup
+manifest.webmanifest    install-to-home-screen info (name, colors, icons)
+sw.js                   offline support; stays at the root so it covers the whole app
 css/styles.css          styling and theme tokens
+assets/
+  icons/                app and home-screen icons
+  images/               images used by the app (sample scene)
+  fonts/                self-hosted fonts
 js/
   main.js               app state, frame loop, event wiring
   util.js               clamp, smoothstep

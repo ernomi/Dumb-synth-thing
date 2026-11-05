@@ -1,5 +1,5 @@
 // Built-in sample scene, shown before the user picks a camera or photo.
-const SAMPLE_URL = new URL("../../hourglass_2.png", import.meta.url);
+const SAMPLE_URL = new URL("../../assets/images/hourglass_2.png", import.meta.url);
 
 let pending = null;
 

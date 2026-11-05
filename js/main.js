@@ -340,6 +340,6 @@ loadSample().then(img => {
 requestAnimationFrame(frame);
 
 // Offline support: stores the app on the phone after the first visit
-if ("serviceWorker" in navigator && location.protocol === "https:") {
+if ("serviceWorker" in navigator && window.isSecureContext) { // https, or localhost while developing
   window.addEventListener("load", () => navigator.serviceWorker.register("sw.js").catch(() => {}));
 }
