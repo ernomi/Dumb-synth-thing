@@ -31,7 +31,7 @@ const LABEL = { sine: "Round", triangle: "Triangle", square: "Square", saw: "Spi
  * @param count   number of voices sounding (for level balancing)
  * @param opts    { scale: keyof SCALES | "free", drive: 0..1 }
  */
-export function mapObject(f, count, { scale, drive: driveAmount }) {
+export function mapObject(f, count, { scale, notes, drive: driveAmount }) {
   const rnd = clamp((f.circ - 0.79) / 0.18, 0, 1); // linear: 0 for a square, 1 for a circle
   const sq  = ss((f.rect - 0.80) / 0.14);      // 1 when it fills its box
   const tri = ss((0.78 - f.rect) / 0.18);      // 1 when it fills half its box
@@ -48,13 +48,14 @@ export function mapObject(f, count, { scale, drive: driveAmount }) {
   // size to pitch, on a log scale
   const t = clamp((Math.log(f.frac) - Math.log(0.002)) / (Math.log(0.3) - Math.log(0.002)), 0, 1);
   let midi = 86 - t * 50;
-  if (scale !== "free") midi = snap(Math.round(midi), SCALES[scale]);
+  const noteSet = notes ?? (scale === "free" ? [] : (SCALES[scale] || []));
+  if (noteSet.length) midi = snap(Math.round(midi), noteSet);
   const freq = 440 * Math.pow(2, (midi - 69) / 12);
   const dist = clamp(1 - (f.bottom - 0.25) / 0.75, 0, 1);
   const drive = f.drive * driveAmount;
   return {
     weights, name, shown, midi, freq, dist, drive,
-    note: scale === "free" ? Math.round(freq) + " Hz" : NOTE[((Math.round(midi) % 12) + 12) % 12] + (Math.floor(Math.round(midi) / 12) - 1),
+    note: noteSet.length ? NOTE[((Math.round(midi) % 12) + 12) % 12] + (Math.floor(Math.round(midi) / 12) - 1) : Math.round(freq) + " Hz",
     cutoff: 700 * Math.pow(2, 4.2 * (1 - dist)),
     level: (0.32 / Math.sqrt(Math.max(1, count))) * (1 - 0.55 * dist),
     wet: 0.04 + 0.96 * dist,

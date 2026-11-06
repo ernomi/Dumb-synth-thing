@@ -122,6 +122,11 @@ button:focus-visible, .btn:focus-visible, select:focus-visible, input:focus-visi
 .settings { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 10px 12px; }
 @media (max-width: 400px) { .settings { grid-template-columns: minmax(0, 1fr); } } /* small phones: one per row so labels aren't cut off */
 .settings label { display: grid; gap: 4px; }
+.scale-control { display: grid; gap: 6px; grid-column: 1 / -1; min-width: 0; }
+.note-picker { display: grid; grid-template-columns: repeat(12, minmax(0, 1fr)); gap: 3px; }
+.note-toggle { min-width: 0; padding: 5px 0; border-radius: 5px; font-size: var(--fs-xs); font-variant-numeric: tabular-nums; }
+.note-toggle[aria-pressed="false"] { color: var(--muted); background: transparent; }
+.note-toggle[aria-pressed="true"] { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
 select, input[type="range"] { width: 100%; font: var(--fs-md) var(--body); }
 select { padding: 8px; border-radius: 8px; border: 1px solid var(--line); background: var(--bg); color: var(--ink); }
 input[type="range"] { accent-color: var(--accent); }

@@ -65,15 +65,19 @@
         <div class="voices" id="voices"></div>
       </div>
       <div class="settings">
-        <label for="scale"><span class="label">Scale</span>
-          <select id="scale">
-            <option value="minpent">Minor pentatonic</option>
-            <option value="majpent">Major pentatonic</option>
-            <option value="major">Major</option>
-            <option value="chrom">Chromatic</option>
-            <option value="free">Free (no snapping)</option>
-          </select>
-        </label>
+        <div class="scale-control">
+          <label for="scale"><span class="label">Scale</span>
+            <select id="scale">
+              <option value="minpent">Minor pentatonic</option>
+              <option value="majpent">Major pentatonic</option>
+              <option value="major">Major</option>
+              <option value="chrom">Chromatic</option>
+              <option value="free">Free (no snapping)</option>
+              <option value="custom">Custom</option>
+            </select>
+          </label>
+          <div class="note-picker" id="notePicker" aria-label="Notes in the selected scale"></div>
+        </div>
         <label for="polarity"><span class="label">Detect by</span>
           <select id="polarity">
             <option value="auto">Outlines + contrast</option>
