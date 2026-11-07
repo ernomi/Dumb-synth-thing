@@ -8,6 +8,7 @@
 // The engine does not touch the page. Settings come in through configureAudio().
 import { clamp } from "../util.js";
 import { requestPlaybackSession, unlockContext } from "./unlock.js";
+import { createVocoder } from "./vocoder.js";
 
 const TYPES = ["sine", "triangle", "square", "sawtooth"]; // matches WAVE_NAMES in mapping.js
 const TRIM = { sine: 1, triangle: 1, square: 0.55, sawtooth: 0.7 }; // even out loudness
@@ -85,24 +86,17 @@ function initAudio() {
   limiter.attack.value = 0.005; limiter.release.value = 0.25;
   analyser = ac.createAnalyser(); analyser.fftSize = 2048;
   // All synth voices (and their reverb) meet on the synth bus. From there the
-  // sound goes to master both clean and through the sample convolver; Blend
-  // sets the mix. The beat joins master separately, so it stays clean.
+  // sound goes to master both clean and through the vocoder; Blend sets the
+  // mix. The beat joins master separately, so it stays clean.
   synthBus = ac.createGain();
-  conv.clean = ac.createGain(); conv.clean.gain.value = 1;
-  conv.wet = ac.createGain(); conv.wet.gain.value = 0;
-  conv.sum = ac.createGain();     // both crossfade slots meet here
-  conv.makeup = ac.createGain();  // loudness match, see matchLoudness()
-  conv.slots = [0, 1].map(() => {
-    const node = ac.createConvolver(), gain = ac.createGain();
-    node.normalize = true;
-    gain.gain.value = 0;
-    synthBus.connect(node); node.connect(gain); gain.connect(conv.sum);
-    return { node, gain };
-  });
-  conv.sum.connect(conv.makeup); conv.makeup.connect(conv.wet);
-  conv.meterIn = ac.createAnalyser(); conv.meterIn.fftSize = 2048; synthBus.connect(conv.meterIn);
-  conv.meterWet = ac.createAnalyser(); conv.meterWet.fftSize = 2048; conv.sum.connect(conv.meterWet);
-  synthBus.connect(conv.clean); conv.clean.connect(master); conv.wet.connect(master);
+  voc.clean = ac.createGain(); voc.clean.gain.value = 1;
+  voc.wet = ac.createGain(); voc.wet.gain.value = 0;
+  voc.makeup = ac.createGain();  // loudness match, see matchLoudness()
+  voc.bank = createVocoder(ac, synthBus);
+  voc.bank.output.connect(voc.makeup); voc.makeup.connect(voc.wet);
+  voc.meterIn = ac.createAnalyser(); voc.meterIn.fftSize = 2048; synthBus.connect(voc.meterIn);
+  voc.meterWet = ac.createAnalyser(); voc.meterWet.fftSize = 2048; voc.bank.output.connect(voc.meterWet);
+  synthBus.connect(voc.clean); voc.clean.connect(master); voc.wet.connect(master);
   reverb = ac.createConvolver(); reverb.buffer = impulse(3.4);
   const revIn = ac.createBiquadFilter(); revIn.type = "highpass"; revIn.frequency.value = 180;
   revIn.connect(reverb); reverb.connect(synthBus); reverb.input = revIn;
@@ -119,59 +113,64 @@ function initAudio() {
   applyTone(true);
 }
 
-// ---------- sound-sample convolution ----------
-const conv = { slots: [], active: 0, hasSample: false, blend: 0.5 };
+// ---------- sound-sample vocoder ----------
+const voc = { hasSample: false, blend: 0.5, sumDry: 0, sumWet: 0, n: 0 };
 
 /**
- * Use `buffer` (a processed sound sample) as the convolution impulse, or null
- * to remove it. A new sample crossfades in over the old one instead of clicking.
+ * Loop `buffer` (a processed sound sample) as the vocoder's modulator, or null
+ * to remove it. A new sample crossfades in over the old one.
  */
-export function setConvolution(buffer) {
+export function setModulator(buffer) {
   initAudio();
-  const t = ac.currentTime, XF = 0.25;
-  const old = conv.slots[conv.active];
-  setParam(old.gain.gain, 0, t, XF / 3);
-  if (buffer) {
-    conv.active = 1 - conv.active;
-    const next = conv.slots[conv.active];
-    next.node.buffer = buffer; // the heavy part (one FFT of the sample), done once
-    setParam(next.gain.gain, 1, t, XF / 3);
-  }
-  conv.hasSample = !!buffer;
-  clearInterval(conv.timer);
-  if (buffer) conv.timer = setInterval(matchLoudness, 100);
+  voc.bank.setModulator(buffer);
+  voc.hasSample = !!buffer;
+  voc.sumDry = voc.sumWet = voc.n = 0;
+  clearInterval(voc.timer);
+  if (buffer) voc.timer = setInterval(matchLoudness, 100);
   applyBlend();
 }
 
-// Convolution only passes the frequencies the synth and the sample share, so a
-// tonal sample (a glass ping) can come out 20-30 dB quieter than the synth while
-// a noisy one (a clap) comes out about level. This keeps the convolved sound as
-// loud as the plain synth, so Blend changes the character, not the volume.
+// The vocoded level depends on the recording (how much energy each band has)
+// and on which notes the synth plays, so it can come out well above or below
+// the plain synth. This keeps the two equally loud on average, so Blend changes
+// the character, not the volume. It averages over ~2 s: a vocoder's output
+// has gaps wherever the recording does, and matching moment to moment would
+// boost those gaps and make the sound pump.
 const meterBuf = new Float32Array(2048);
-function rms(an) {
+function power(an) {
   an.getFloatTimeDomainData(meterBuf);
   let s = 0; for (let i = 0; i < meterBuf.length; i++) s += meterBuf[i] * meterBuf[i];
-  return Math.sqrt(s / meterBuf.length);
+  return s / meterBuf.length;
 }
 function matchLoudness() {
   if (!playing || ac.state !== "running") return;
-  const dry = rms(conv.meterIn), wet = rms(conv.meterWet);
-  if (dry < 1e-4 || wet < 1e-7) return; // silence: keep the current gain
-  const target = clamp(dry / wet, 0.5, 31.6); // at most +30 dB, so it never pumps up noise
-  conv.makeup.gain.setTargetAtTime(target, ac.currentTime, 0.3);
+  const dry = power(voc.meterIn);
+  if (dry < 1e-8) return; // synth silent: nothing to compare
+  voc.sumDry += dry; voc.sumWet += power(voc.meterWet); voc.n++;
+  if (voc.n < 20) return;
+  if (voc.sumWet > 1e-12) {
+    const target = clamp(Math.sqrt(voc.sumDry / voc.sumWet), 0.25, 16); // -12 dB .. +24 dB
+    voc.makeup.gain.setTargetAtTime(target, ac.currentTime, 0.6);
+  }
+  voc.sumDry = voc.sumWet = voc.n = 0;
 }
 
-/** 0 = plain synth, 1 = synth fully through the sample. Equal-power mix in between. */
+/**
+ * 0 = plain synth, 1 = synth fully vocoded by the sample. The plain synth fades
+ * out faster than the vocoder fades in: with a plain 50/50 mix the steady synth
+ * fills the vocoder's gaps and the rhythm gets lost. At 50% the plain synth is
+ * already down 12 dB and the vocoder leads.
+ */
 export function setBlend(b) {
-  conv.blend = clamp(b, 0, 1);
+  voc.blend = clamp(b, 0, 1);
   applyBlend();
 }
 
 function applyBlend() {
   if (!ac) return;
-  const b = conv.hasSample ? conv.blend : 0, t = ac.currentTime;
-  setParam(conv.clean.gain, Math.cos(b * Math.PI / 2), t, 0.05);
-  setParam(conv.wet.gain, Math.sin(b * Math.PI / 2), t, 0.05);
+  const b = voc.hasSample ? voc.blend : 0, t = ac.currentTime;
+  setParam(voc.clean.gain, (1 - b) * (1 - b), t, 0.05);
+  setParam(voc.wet.gain, Math.sin(b * Math.PI / 2), t, 0.05);
 }
 
 /** Silence the speaker (not the recording tap), e.g. while the mic listens. */

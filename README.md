@@ -28,7 +28,8 @@ js/
     engine.js           Web Audio synth: voices, reverb, scene-tone EQ, limiter
     unlock.js           mobile/iOS audio unlock workarounds
     beat.js             looping drum beats: loop points, tempo
-    sample.js           records a sound from the mic and makes it a convolution impulse
+    sample.js           records a sound from the mic and makes it a vocoder loop
+    vocoder.js          20-band channel vocoder: the sample shapes the synth
   ui/
     settings.js         reads the settings panel controls
     render.js           overlay, oscilloscope, scene text

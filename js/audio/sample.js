@@ -1,13 +1,13 @@
 // Sound sample: record a short sound from the microphone and turn it into a
-// convolution impulse, so the synth plays "through" that sound (a tapped glass
-// makes it ring like glass, a sung vowel gives it that vowel's colour).
+// loop that drives the vocoder (see vocoder.js), so the synth takes on the
+// sound's rhythm and tone: speech makes it talk, beatbox makes it pulse.
 //
 // The mic is only open for the capture itself. On iPhone an open mic switches
 // audio into call mode (quieter, sometimes to the earpiece), so it's released
 // straight away and the normal playback mode is asked for again.
 import { audioContext, muteSpeaker, unlockAudio } from "./engine.js";
 
-export const MAX_SECONDS = 2;
+export const MAX_SECONDS = 4; // room for a word, a phrase or a beatbox pattern
 
 let capture = null; // { stop() } while recording
 
@@ -18,7 +18,7 @@ export function stopCapture() { if (capture) capture.stop(); }
 
 /**
  * Record up to MAX_SECONDS from the mic. Resolves to { buffer, peaks } where
- * buffer is the cleaned-up impulse and peaks is a small envelope for drawing.
+ * buffer is the cleaned-up loop and peaks is a small envelope for drawing.
  * Errors are thrown with a message meant for the user.
  * @param onTick  called with elapsed seconds while recording
  */
@@ -75,9 +75,10 @@ export async function recordSample(onTick = () => {}) {
 }
 
 /**
- * Raw recording -> impulse: mono, start trimmed to the first sound, at most
- * MAX_SECONDS, lows below 120 Hz removed (they turn to mud), short fade-in
- * and a smooth fade-out so it doesn't end with a click.
+ * Raw recording -> vocoder loop: mono, start trimmed to the first sound, end
+ * trimmed after the last, at most MAX_SECONDS, lows below 120 Hz removed (room
+ * rumble and handling noise), peak-normalized so quiet and loud recordings drive
+ * the vocoder alike, and 10 ms fades at both ends so the loop repeats cleanly.
  */
 async function prepare(raw, ac) {
   const sr = raw.sampleRate, n = raw.length;
@@ -105,9 +106,11 @@ async function prepare(raw, ac) {
   const rendered = await off.startRendering();
 
   const d = rendered.getChannelData(0);
-  const fadeIn = Math.round(sr * 0.003), fadeOut = Math.round(len * 0.2);
-  for (let i = 0; i < fadeIn && i < len; i++) d[i] *= i / fadeIn;
-  for (let i = 0; i < fadeOut; i++) d[len - 1 - i] *= 0.5 - 0.5 * Math.cos(Math.PI * i / fadeOut);
+  let pk = 0; for (let i = 0; i < len; i++) pk = Math.max(pk, Math.abs(d[i]));
+  const norm = pk > 0 ? 0.9 / pk : 1;
+  for (let i = 0; i < len; i++) d[i] *= norm;
+  const fade = Math.min(Math.round(sr * 0.01), Math.floor(len / 4));
+  for (let i = 0; i < fade; i++) { const g = 0.5 - 0.5 * Math.cos(Math.PI * i / fade); d[i] *= g; d[len - 1 - i] *= g; }
 
   // Copy into a buffer of the live context (sample rates can differ from the mic's)
   const buffer = ac.createBuffer(1, len, sr);

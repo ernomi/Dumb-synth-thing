@@ -223,7 +223,7 @@ function selectBeat(id) {
 
 bindBeatPanel({ onSelect: selectBeat, onTempo: bpm => setBeatTempo(bpm) });
 
-// ---------- sound sample (convolution) ----------
+// ---------- sound sample (vocoder) ----------
 let samplePeaks = null; // envelope of the current sample, for redrawing
 
 async function recordSound() {
@@ -233,12 +233,12 @@ async function recordSound() {
   setStatus("Listening… make a sound.");
   try {
     const { buffer, peaks } = await recordSample(s => showSampleState("recording", s));
-    audio.setConvolution(buffer);
+    audio.setModulator(buffer);
     audio.setBlend(+$("blend").value);
     samplePeaks = peaks;
     showSampleState("ready"); drawSample(peaks);
     if (!audio.isPlaying()) setPlaying(true); // hear the result straight away
-    setStatus("Sound sample ready. The synth now plays through it; Blend sets how much.");
+    setStatus("Sound sample ready. It loops in the background and the synth follows its rhythm and tone; Blend sets how much.");
   } catch (e) {
     showSampleState(samplePeaks ? "ready" : "empty");
     if (samplePeaks) drawSample(samplePeaks); // keep showing the previous sample
@@ -249,7 +249,7 @@ async function recordSound() {
 bindSamplePanel({
   onRecord: recordSound,
   onClear: () => {
-    audio.setConvolution(null); samplePeaks = null;
+    audio.setModulator(null); samplePeaks = null;
     showSampleState("empty"); setStatus("Sound sample cleared.");
   },
   onBlend: v => audio.setBlend(v),
