@@ -60,6 +60,18 @@
         <canvas id="scope" width="600" height="128" aria-label="Oscilloscope of the combined sound"></canvas>
         <div class="scene" id="scene" aria-live="polite"></div>
       </div>
+      <div class="beat">
+        <h2>Beat</h2>
+        <div class="beat-buttons" role="group" aria-label="Beat">
+          <button type="button" class="beat-btn" data-beat="off" aria-pressed="true">Off</button>
+          <button type="button" class="beat-btn" data-beat="I" aria-pressed="false" title="Straight techno, 124 BPM">I</button>
+          <button type="button" class="beat-btn" data-beat="II" aria-pressed="false" title="Electro loop, 110 BPM">II</button>
+          <button type="button" class="beat-btn" data-beat="III" aria-pressed="false" title="Amen break, 140 BPM">III</button>
+        </div>
+        <label for="tempo"><span class="label">Tempo <output id="tempoOut">124 BPM</output></span>
+          <input id="tempo" type="range" min="60" max="180" step="1" value="124" disabled>
+        </label>
+      </div>
       <div style="display:grid; gap:8px">
         <h2>Voices</h2>
         <div class="voices" id="voices"></div>

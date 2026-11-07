@@ -80,6 +80,13 @@ button:focus-visible, .btn:focus-visible, select:focus-visible, input:focus-visi
 
 .panel { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 16px; display: grid; gap: 14px; min-width: 0; }
 .panel h2 { font-family: var(--display); font-weight: 500; font-size: var(--fs-lg); margin: 0; }
+/* Beat: Off / I / II / III in four equal columns, tempo slider underneath */
+.beat { display: grid; gap: 8px; }
+.beat label { display: grid; gap: 4px; }
+.beat-buttons { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
+.beat-btn { width: 100%; min-height: 44px; }
+.beat-btn[aria-pressed="true"] { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+.beat input:disabled { opacity: 0.4; }
 .label { font-family: var(--mono); font-size: var(--fs-xs); letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
 #scope { width: 100%; height: 64px; display: block; border-radius: 8px; background: var(--bg); }
 

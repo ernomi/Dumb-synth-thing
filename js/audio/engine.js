@@ -48,6 +48,17 @@ export function getAudioStream() {
   return recordDest.stream;
 }
 
+/**
+ * Where the beat plugs in. It joins the synth at the master volume, so the
+ * Volume slider, the limiter, the scope and recordings all include it.
+ */
+let beatBus = null;
+export function beatOutput() {
+  initAudio();
+  if (!beatBus) { beatBus = ac.createGain(); beatBus.connect(master); }
+  return beatBus;
+}
+
 export function setVolume(v) {
   if (master) master.gain.setTargetAtTime(v, ac.currentTime, 0.05);
 }

@@ -7,18 +7,19 @@
 // FILES is stored at install so the app works offline after the very first
 // visit. If you add a module and forget to list it here, it's still cached on
 // the next online visit. Raise VERSION to clear out old caches.
-const VERSION = "v5";
+const VERSION = "v6";
 const APP = "pocketwizard-app-" + VERSION;
 const FILES = [
   "./", "index.html", "manifest.webmanifest", "css/styles.css",
   "assets/fonts/Faustus.ttf", "assets/fonts/Alkhemikal.ttf", "assets/images/hourglass_2.png",
+  "assets/beats/straight-techno-beat.mp3", "assets/beats/electro-loop-110-bpm.mp3", "assets/beats/amen140bpm.mp3",
   "assets/icons/icon-192.png", "assets/icons/icon-512.png", "assets/icons/apple-touch-icon.png",
   "js/main.js", "js/util.js", "js/mapping.js", "js/tracking.js",
   "js/analysis/color.js", "js/analysis/detect.js", "js/analysis/geometry.js", "js/analysis/image.js",
-  "js/audio/engine.js", "js/audio/unlock.js",
+  "js/audio/engine.js", "js/audio/unlock.js", "js/audio/beat.js",
   "js/recording/compose.js", "js/recording/finalize.js", "js/recording/recorder.js", "js/recording/share.js",
   "js/sources/camera.js", "js/sources/image-file.js", "js/sources/sample.js", "js/sources/zoom.js",
-  "js/ui/pinch.js", "js/ui/render.js", "js/ui/settings.js", "js/ui/theme.js", "js/ui/voices.js",
+  "js/ui/pinch.js", "js/ui/render.js", "js/ui/settings.js", "js/ui/theme.js", "js/ui/voices.js", "js/ui/beat-panel.js",
   // js/vendor/mediabunny (700 KB) is left out on purpose: it's cached the first
   // time a recording finishes, and without it recordings still save, just unpolished.
 ];

@@ -16,6 +16,8 @@ import { createRecordCanvas, drawRecordFrame } from "./recording/compose.js";
 import { Recorder, recordingSupported } from "./recording/recorder.js";
 import { videoFile, isMp4, canShareFile, shareFile } from "./recording/share.js";
 import { finalizeRecording } from "./recording/finalize.js";
+import { playBeat, stopBeat, setBeatTempo, nativeBpm } from "./audio/beat.js";
+import { bindBeatPanel, showBeat } from "./ui/beat-panel.js";
 
 const $ = (id) => document.getElementById(id);
 const view = $("view"), vctx = view.getContext("2d");
@@ -194,9 +196,30 @@ for (const id of ["liveBtn", "flipBtn", "sampleBtn", "photoBtn", "uploadBtn"])
 function setPlaying(playing) {
   if (playing) { audio.unlockAudio(); setTimeout(audio.audioCheck, 800); }
   audio.setPlaying(playing);
+  // Play/Stop is the transport for the beat too; the chosen beat is remembered while stopped
+  if (playing && beatChoice !== "off") startBeat(beatChoice);
+  if (!playing) stopBeat();
   $("play").setAttribute("aria-pressed", String(playing));
   $("play").textContent = playing ? "■ Stop" : "▶ Play";
 }
+
+// ---------- beat ----------
+let beatChoice = "off";
+
+function startBeat(id) {
+  playBeat(id).catch(() => setStatus("That beat couldn't be loaded. Check the connection and try again."));
+}
+
+function selectBeat(id) {
+  beatChoice = id;
+  setBeatTempo(null); // each beat starts at its own tempo
+  showBeat(id, id === "off" ? null : nativeBpm(id));
+  if (id === "off") { stopBeat(); return; }
+  if (audio.isPlaying()) startBeat(id);
+  else setPlaying(true); // picking a beat starts the sound (this tap unlocks audio on phones)
+}
+
+bindBeatPanel({ onSelect: selectBeat, onTempo: bpm => setBeatTempo(bpm) });
 $("play").addEventListener("click", () => {
   const playing = !audio.isPlaying();
   setPlaying(playing);

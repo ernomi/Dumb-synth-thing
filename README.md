@@ -12,6 +12,7 @@ css/styles.css          styling and theme tokens
 assets/
   icons/                app and home-screen icons
   images/               images used by the app (sample scene)
+  beats/                drum loops for the Beat section (MP3)
   fonts/                self-hosted fonts
 js/
   main.js               app state, frame loop, event wiring
@@ -26,10 +27,12 @@ js/
   audio/
     engine.js           Web Audio synth: voices, reverb, scene-tone EQ, limiter
     unlock.js           mobile/iOS audio unlock workarounds
+    beat.js             looping drum beats: loop points, tempo
   ui/
     settings.js         reads the settings panel controls
     render.js           overlay, oscilloscope, scene text
     voices.js           voice list; tap a voice to open its details
+    beat-panel.js       Beat section: Off / I / II / III and the tempo slider
     theme.js            colors from CSS custom properties
     pinch.js            two-finger pinch and trackpad pinch gestures
   sources/
