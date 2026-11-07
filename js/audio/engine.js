@@ -12,7 +12,7 @@ import { requestPlaybackSession, unlockContext } from "./unlock.js";
 const TYPES = ["sine", "triangle", "square", "sawtooth"]; // matches WAVE_NAMES in mapping.js
 const TRIM = { sine: 1, triangle: 1, square: 0.55, sawtooth: 0.7 }; // even out loudness
 
-let ac = null, master, reverb, analyser, playing = false;
+let ac = null, master, reverb, analyser, synthBus, speaker, playing = false;
 const voices = new Map();
 const eq = {};
 let sceneTone = 0;
@@ -84,18 +84,104 @@ function initAudio() {
   limiter.threshold.value = -8; limiter.knee.value = 6; limiter.ratio.value = 16;
   limiter.attack.value = 0.005; limiter.release.value = 0.25;
   analyser = ac.createAnalyser(); analyser.fftSize = 2048;
+  // All synth voices (and their reverb) meet on the synth bus. From there the
+  // sound goes to master both clean and through the sample convolver; Blend
+  // sets the mix. The beat joins master separately, so it stays clean.
+  synthBus = ac.createGain();
+  conv.clean = ac.createGain(); conv.clean.gain.value = 1;
+  conv.wet = ac.createGain(); conv.wet.gain.value = 0;
+  conv.sum = ac.createGain();     // both crossfade slots meet here
+  conv.makeup = ac.createGain();  // loudness match, see matchLoudness()
+  conv.slots = [0, 1].map(() => {
+    const node = ac.createConvolver(), gain = ac.createGain();
+    node.normalize = true;
+    gain.gain.value = 0;
+    synthBus.connect(node); node.connect(gain); gain.connect(conv.sum);
+    return { node, gain };
+  });
+  conv.sum.connect(conv.makeup); conv.makeup.connect(conv.wet);
+  conv.meterIn = ac.createAnalyser(); conv.meterIn.fftSize = 2048; synthBus.connect(conv.meterIn);
+  conv.meterWet = ac.createAnalyser(); conv.meterWet.fftSize = 2048; conv.sum.connect(conv.meterWet);
+  synthBus.connect(conv.clean); conv.clean.connect(master); conv.wet.connect(master);
   reverb = ac.createConvolver(); reverb.buffer = impulse(3.4);
   const revIn = ac.createBiquadFilter(); revIn.type = "highpass"; revIn.frequency.value = 180;
-  revIn.connect(reverb); reverb.connect(master); reverb.input = revIn;
+  revIn.connect(reverb); reverb.connect(synthBus); reverb.input = revIn;
   // Scene tone EQ: low-mid boost for warm scenes; treble lift and mid scoop for cool ones
   const dc = ac.createBiquadFilter(); dc.type = "highpass"; dc.frequency.value = 25; dc.Q.value = 0.7;
   eq.lowMid = ac.createBiquadFilter(); eq.lowMid.type = "peaking"; eq.lowMid.frequency.value = 280; eq.lowMid.Q.value = 0.9;
   eq.scoop = ac.createBiquadFilter(); eq.scoop.type = "peaking"; eq.scoop.frequency.value = 1100; eq.scoop.Q.value = 0.7;
   eq.bright = ac.createBiquadFilter(); eq.bright.type = "highshelf"; eq.bright.frequency.value = 3500;
   master.connect(dc); dc.connect(eq.lowMid); eq.lowMid.connect(eq.scoop); eq.scoop.connect(eq.bright); eq.bright.connect(limiter);
-  limiter.connect(analyser); analyser.connect(ac.destination);
+  // The speaker gain only mutes what you hear (while recording a sound sample);
+  // the scope and video recordings tap in before it.
+  speaker = ac.createGain();
+  limiter.connect(analyser); analyser.connect(speaker); speaker.connect(ac.destination);
   applyTone(true);
 }
+
+// ---------- sound-sample convolution ----------
+const conv = { slots: [], active: 0, hasSample: false, blend: 0.5 };
+
+/**
+ * Use `buffer` (a processed sound sample) as the convolution impulse, or null
+ * to remove it. A new sample crossfades in over the old one instead of clicking.
+ */
+export function setConvolution(buffer) {
+  initAudio();
+  const t = ac.currentTime, XF = 0.25;
+  const old = conv.slots[conv.active];
+  setParam(old.gain.gain, 0, t, XF / 3);
+  if (buffer) {
+    conv.active = 1 - conv.active;
+    const next = conv.slots[conv.active];
+    next.node.buffer = buffer; // the heavy part (one FFT of the sample), done once
+    setParam(next.gain.gain, 1, t, XF / 3);
+  }
+  conv.hasSample = !!buffer;
+  clearInterval(conv.timer);
+  if (buffer) conv.timer = setInterval(matchLoudness, 100);
+  applyBlend();
+}
+
+// Convolution only passes the frequencies the synth and the sample share, so a
+// tonal sample (a glass ping) can come out 20-30 dB quieter than the synth while
+// a noisy one (a clap) comes out about level. This keeps the convolved sound as
+// loud as the plain synth, so Blend changes the character, not the volume.
+const meterBuf = new Float32Array(2048);
+function rms(an) {
+  an.getFloatTimeDomainData(meterBuf);
+  let s = 0; for (let i = 0; i < meterBuf.length; i++) s += meterBuf[i] * meterBuf[i];
+  return Math.sqrt(s / meterBuf.length);
+}
+function matchLoudness() {
+  if (!playing || ac.state !== "running") return;
+  const dry = rms(conv.meterIn), wet = rms(conv.meterWet);
+  if (dry < 1e-4 || wet < 1e-7) return; // silence: keep the current gain
+  const target = clamp(dry / wet, 0.5, 31.6); // at most +30 dB, so it never pumps up noise
+  conv.makeup.gain.setTargetAtTime(target, ac.currentTime, 0.3);
+}
+
+/** 0 = plain synth, 1 = synth fully through the sample. Equal-power mix in between. */
+export function setBlend(b) {
+  conv.blend = clamp(b, 0, 1);
+  applyBlend();
+}
+
+function applyBlend() {
+  if (!ac) return;
+  const b = conv.hasSample ? conv.blend : 0, t = ac.currentTime;
+  setParam(conv.clean.gain, Math.cos(b * Math.PI / 2), t, 0.05);
+  setParam(conv.wet.gain, Math.sin(b * Math.PI / 2), t, 0.05);
+}
+
+/** Silence the speaker (not the recording tap), e.g. while the mic listens. */
+export function muteSpeaker(muted) {
+  initAudio();
+  setParam(speaker.gain, muted ? 0 : 1, ac.currentTime, 0.02);
+}
+
+/** The shared AudioContext (created on first use). */
+export function audioContext() { initAudio(); return ac; }
 
 function impulse(sec) {
   const sr = ac.sampleRate, len = Math.floor(sr * sec), buf = ac.createBuffer(2, len, sr);
@@ -189,7 +275,7 @@ function createVoice(p) {
   pre.connect(s2); s2.connect(h2); h2.connect(filt);
   pre.connect(s3); s3.connect(h3); h3.connect(filt);
   filt.connect(level); level.connect(envG); envG.connect(dry); envG.connect(wet);
-  dry.connect(master); wet.connect(reverb.input);
+  dry.connect(synthBus); wet.connect(reverb.input);
   // Attack: ramp up from silence
   const { attack } = getSettings();
   envG.gain.setValueAtTime(0, t);

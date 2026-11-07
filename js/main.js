@@ -18,6 +18,8 @@ import { videoFile, isMp4, canShareFile, shareFile } from "./recording/share.js"
 import { finalizeRecording } from "./recording/finalize.js";
 import { playBeat, stopBeat, setBeatTempo, nativeBpm } from "./audio/beat.js";
 import { bindBeatPanel, showBeat } from "./ui/beat-panel.js";
+import { recordSample, isCapturing, stopCapture } from "./audio/sample.js";
+import { bindSamplePanel, showSampleState, drawSample } from "./ui/sample-panel.js";
 
 const $ = (id) => document.getElementById(id);
 const view = $("view"), vctx = view.getContext("2d");
@@ -220,6 +222,38 @@ function selectBeat(id) {
 }
 
 bindBeatPanel({ onSelect: selectBeat, onTempo: bpm => setBeatTempo(bpm) });
+
+// ---------- sound sample (convolution) ----------
+let samplePeaks = null; // envelope of the current sample, for redrawing
+
+async function recordSound() {
+  if (isCapturing()) { stopCapture(); return; } // second tap stops early
+  audio.unlockAudio(); // inside the tap, so phones allow sound afterwards
+  showSampleState("recording", 0);
+  setStatus("Listening… make a sound.");
+  try {
+    const { buffer, peaks } = await recordSample(s => showSampleState("recording", s));
+    audio.setConvolution(buffer);
+    audio.setBlend(+$("blend").value);
+    samplePeaks = peaks;
+    showSampleState("ready"); drawSample(peaks);
+    if (!audio.isPlaying()) setPlaying(true); // hear the result straight away
+    setStatus("Sound sample ready. The synth now plays through it; Blend sets how much.");
+  } catch (e) {
+    showSampleState(samplePeaks ? "ready" : "empty");
+    if (samplePeaks) drawSample(samplePeaks); // keep showing the previous sample
+    setStatus(e.message);
+  }
+}
+
+bindSamplePanel({
+  onRecord: recordSound,
+  onClear: () => {
+    audio.setConvolution(null); samplePeaks = null;
+    showSampleState("empty"); setStatus("Sound sample cleared.");
+  },
+  onBlend: v => audio.setBlend(v),
+});
 $("play").addEventListener("click", () => {
   const playing = !audio.isPlaying();
   setPlaying(playing);

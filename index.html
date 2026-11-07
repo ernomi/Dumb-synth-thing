@@ -72,6 +72,18 @@
           <input id="tempo" type="range" min="60" max="180" step="1" value="124" disabled>
         </label>
       </div>
+      <div class="snd">
+        <h2>Sound sample</h2>
+        <p class="note-small">Record a short sound (tap a glass, clap, sing a vowel) and the synth plays through it.</p>
+        <div class="snd-buttons">
+          <button type="button" id="sndRecBtn" aria-pressed="false">● Record sound</button>
+          <button type="button" id="sndClearBtn" disabled>Clear</button>
+        </div>
+        <svg id="sndWave" class="snd-wave" viewBox="0 0 200 32" preserveAspectRatio="none" aria-hidden="true" hidden></svg>
+        <label for="blend"><span class="label">Blend <output id="blendOut">50%</output></span>
+          <input id="blend" type="range" min="0" max="1" step="0.01" value="0.5" disabled>
+        </label>
+      </div>
       <div style="display:grid; gap:8px">
         <h2>Voices</h2>
         <div class="voices" id="voices"></div>
