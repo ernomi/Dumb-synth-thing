@@ -98,7 +98,15 @@ button:focus-visible, .btn:focus-visible, select:focus-visible, input:focus-visi
 .label { font-family: var(--mono); font-size: var(--fs-xs); letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
 #scope { width: 100%; height: 64px; display: block; border-radius: 8px; background: var(--bg); }
 
-.voices { display: grid; gap: 8px; }
+/* Fixed-height scroll area, so the sections below don't jump as voices come
+   and go. A collapsed voice is ~86px + 8px gap: phones show ~3.5 (the half row
+   hints that it scrolls); the two-column desktop layout fits all 5 collapsed. */
+.voices {
+  display: grid; gap: 8px; align-content: start;
+  height: 330px; overflow-y: auto; position: relative;
+  padding-right: 2px; scrollbar-width: thin; scrollbar-color: var(--line) transparent;
+}
+@media (min-width: 821px) { .voices { height: 478px; } }
 .voice { border-radius: 10px; background: var(--bg); border: 1px solid transparent; }
 .voice.open { border-color: var(--line); }
 /* The tappable summary row: reset the generic button look */

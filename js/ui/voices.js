@@ -69,7 +69,16 @@ function bind(listEl) {
     if (expanded.has(id)) expanded.delete(id); else expanded.add(id);
     applyOpen(node, id);
     if (expanded.has(id) && node._track) node.querySelector(".voice-details").innerHTML = detailsHTML(node._track);
+    if (expanded.has(id)) reveal(listEl, node);
   });
+}
+
+// The list scrolls inside a fixed-height box: when a voice opens near the
+// bottom, scroll just enough to show its details (never past its own top).
+function reveal(listEl, node) {
+  const top = node.offsetTop, bottom = top + node.offsetHeight;
+  const target = Math.min(top, bottom - listEl.clientHeight);
+  if (target > listEl.scrollTop) listEl.scrollTo({ top: target, behavior: "smooth" });
 }
 
 function applyOpen(node, id) {
